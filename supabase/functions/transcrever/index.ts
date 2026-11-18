@@ -1,7 +1,9 @@
 // Edge Function "transcrever": pega um áudio da contagem no Storage, manda para o
-// Whisper (OpenAI) e grava o texto em audio_contagem.transcricao.
+// Whisper e grava o texto em audio_contagem.transcricao.
 //
-// Segredo necessário (Supabase > Edge Functions > Secrets): OPENAI_API_KEY
+// Segredo necessário (Supabase > Edge Functions > Secrets), um dos dois:
+//   GROQ_API_KEY   -> Whisper da Groq (gratuito com limite diário; usado se existir)
+//   OPENAI_API_KEY -> Whisper da OpenAI (pago por minuto)
 // Chamada pelo app: supabase.functions.invoke('transcrever', { body: { audio_id } })
 import { createClient } from 'npm:@supabase/supabase-js@2.119.0';
 
@@ -45,16 +47,21 @@ Deno.serve(async (req) => {
     const nome = audio.arquivo.split('/').pop()!;
     const form = new FormData();
     form.append('file', new File([arquivo], nome, { type: arquivo.type || 'audio/webm' }));
-    form.append('model', 'whisper-1');
+    const groq = Deno.env.get('GROQ_API_KEY');
+    const servico = groq
+      ? { url: 'https://api.groq.com/openai/v1/audio/transcriptions', chave: groq, modelo: 'whisper-large-v3-turbo', nome: 'Groq' }
+      : { url: 'https://api.openai.com/v1/audio/transcriptions', chave: Deno.env.get('OPENAI_API_KEY'), modelo: 'whisper-1', nome: 'OpenAI' };
+    if (!servico.chave) throw new Error('Falta configurar a chave de transcrição (GROQ_API_KEY ou OPENAI_API_KEY) no Supabase.');
+    form.append('model', servico.modelo);
     form.append('language', 'pt');
     form.append('prompt', dica.slice(0, 900));
-    const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    const r = await fetch(servico.url, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${Deno.env.get('OPENAI_API_KEY')}` },
+      headers: { Authorization: `Bearer ${servico.chave}` },
       body: form,
     });
     const resp = await r.json();
-    if (!r.ok) throw new Error(resp?.error?.message ?? `OpenAI respondeu ${r.status}`);
+    if (!r.ok) throw new Error(resp?.error?.message ?? `${servico.nome} respondeu ${r.status}`);
 
     await adm.from('audio_contagem').update({ status: 'transcrito', transcricao: resp.text, erro: null }).eq('id', audio_id);
     return json({ texto: resp.text });
