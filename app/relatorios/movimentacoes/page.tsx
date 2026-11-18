@@ -9,9 +9,9 @@ import { dataBR, dec, int, reais } from '@/lib/formato';
 import type { Movimentacao } from '@/lib/tipos';
 
 // Grupos do relatório, na ordem em que aparecem
-const GRUPOS: { titulo: string; codigos: string[]; valor: boolean; por?: 'contraparte' | 'causa' }[] = [
-  { titulo: 'Compras', codigos: ['AQUISICAO'], valor: true, por: 'contraparte' },
-  { titulo: 'Vendas', codigos: ['VENDA'], valor: true, por: 'contraparte' },
+const GRUPOS: { titulo: string; codigos: string[]; valor: boolean; por?: 'causa' }[] = [
+  { titulo: 'Compras', codigos: ['AQUISICAO'], valor: true },
+  { titulo: 'Vendas', codigos: ['VENDA'], valor: true },
   { titulo: 'Vendas internas (entrada)', codigos: ['VENDA_INT_ENTRADA'], valor: true },
   { titulo: 'Vendas internas (saída)', codigos: ['VENDA_INT_SAIDA'], valor: true },
   { titulo: 'Nascimentos', codigos: ['NASCIMENTO'], valor: false },
@@ -44,7 +44,6 @@ export default function RelMovimentacoes() {
 
   const cat = (id: number) => cad.categorias.find(c => c.id === id);
   const nomeCausa = (id: number | null) => cad.causas.find(c => c.id === id)?.nome ?? 'Sem causa informada';
-  const nomeCp = (id: number | null) => cad.contrapartes.find(c => c.id === id)?.nome ?? 'Não informado';
 
   return (
     <Moldura>
@@ -66,7 +65,7 @@ export default function RelMovimentacoes() {
           if (!porCat.has(m.categoria_id)) porCat.set(m.categoria_id, nova());
           somar(porCat.get(m.categoria_id)!, m); somar(total, m);
           if (g.por) {
-            const k = g.por === 'causa' ? nomeCausa(m.causa_morte_id) : nomeCp(m.contraparte_id);
+            const k = nomeCausa(m.causa_morte_id);
             if (!porQuem.has(k)) porQuem.set(k, nova());
             somar(porQuem.get(k)!, m);
           }
@@ -103,7 +102,7 @@ export default function RelMovimentacoes() {
             {g.por && porQuem.size > 0 && (
               <div className="rolagem" style={{ marginTop: 8 }}>
                 <table>
-                  <thead>{cabecalho(g.por === 'causa' ? 'Causa' : g.titulo === 'Compras' ? 'Vendedor' : 'Comprador')}</thead>
+                  <thead>{cabecalho('Causa')}</thead>
                   <tbody>
                     {[...porQuem.entries()].sort((a, b) => b[1].cab - a[1].cab).map(([k, s]) => <tr key={k}><td>{k}</td>{colunas(s)}</tr>)}
                   </tbody>
