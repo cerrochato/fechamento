@@ -1,6 +1,6 @@
 'use client';
 // Painel de uma espécie, no modelo das abas "DASH BOVINOS" e "DASH OVINOS" da planilha
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useApp } from '@/lib/contexto';
 import { efetivoPeriodo, mesesDoPeriodo, movimentacoes } from '@/lib/dados';
 import { dec, int, reais } from '@/lib/formato';
@@ -47,7 +47,7 @@ export default function DashEspecie({ especieId, de, ate, todas }: { especieId: 
   const precoKg = (l: Movimentacao[]) => (kgComValor(l) ? valor(l) / kgComValor(l) : 0);
   const porMes = (ms: Movimentacao[]) => mesesDoPeriodo(de, ate).map(({ mes }) => {
     const l = ms.filter(m => m.data.slice(0, 7) === mes.slice(0, 7));
-    return { rotulo: nomeMes(mes), valor: valor(l), texto: reais(valor(l)), dica: `${int(cab(l))} cab.` };
+    return { rotulo: nomeMes(mes).slice(0, 3), valor: valor(l), texto: valor(l) ? dec(valor(l) / 1000, 0) : '', dica: `${reais(valor(l))} · ${int(cab(l))} cab.` };
   });
   const causas = (() => {
     const g = new Map<string, number>();
@@ -60,75 +60,131 @@ export default function DashEspecie({ especieId, de, ate, todas }: { especieId: 
   const touros = vendas.filter(m => /^touro/i.test(cat(m.categoria_id)?.nome ?? ''));
   const totTouros = valor(touros);
 
+  const mortes = de_('MORTE'), consumo = de_('CONSUMO'), nasc = de_('NASCIMENTO');
+  const ent = de_('VENDA_INT_ENTRADA'), sai = de_('VENDA_INT_SAIDA');
+  const saldo = valor(vendas) - valor(compras);
+
   return (
     <>
-      <div className="tiles">
-        <Tile t="Rebanho" v={`${int(ini)} → ${int(fim)}`} s={`${fim - ini >= 0 ? '+' : ''}${int(fim - ini)} cabeças no período`} />
-        <Tile t="Vendas" v={reais(valor(vendas))} s={`${int(cab(vendas))} cab. · ${dec(precoKg(vendas))} R$/kg · ${int(pesoMedio(vendas))} kg/cab`} />
-        <Tile t="Compras" v={reais(valor(compras))} s={`${int(cab(compras))} cab. · ${dec(precoKg(compras))} R$/kg`} />
-        <Tile t="Nascimentos · mortes" v={`${int(cab(de_('NASCIMENTO')))} · ${int(cab(de_('MORTE')))}`} s={`consumo ${int(cab(de_('CONSUMO')))} cab.`} />
+      <div className="dash-hero">
+        <Hero t={`Rebanho ${esp.nome.toLowerCase()} atual`} v={int(fim)} s={`${int(ini)} no início · ${fim - ini >= 0 ? '+' : ''}${int(fim - ini)} cab.`} />
+        <Hero t="Faturamento com vendas" v={compacto(valor(vendas))} s={`${int(cab(vendas))} cab. vendidas`} />
+        <Hero t="Desembolso com compras" v={compacto(valor(compras))} s={`${int(cab(compras))} cab. compradas`} />
+        <Hero t="Vendas − compras" v={compacto(saldo)} s={saldo >= 0 ? 'saldo positivo no período' : 'saldo negativo no período'} />
+        <Hero t="Nascimentos · mortes" v={`${int(cab(nasc))} · ${int(cab(mortes))}`} s={`mortes = ${dec(ini ? cab(mortes) / ini * 100 : 0, 1)}% do rebanho inicial`} />
       </div>
 
-      <div className="grade-dash">
-        <Barras t="Vendas por categoria" s="cabeças" itens={porCategoria(vendas, cab, int)} />
-        <Barras t="Peso médio de venda" s="kg por cabeça" itens={porCategoria(vendas, pesoMedio, v => int(v))} />
-        <Barras t="Preço médio de venda" s="R$ por kg" itens={porCategoria(vendas, precoKg, v => dec(v), l => reais(valor(l)))} />
-        <Colunas t="Vendas mês a mês" s="R$" itens={porMes(vendas)} />
-        <Barras t="Compras por categoria" s="cabeças" itens={porCategoria(compras, cab, int)} />
-        <Barras t="Peso médio de compra" s="kg por cabeça" itens={porCategoria(compras, pesoMedio, v => int(v))} />
-        <Barras t="Preço médio de compra" s="R$ por kg" itens={porCategoria(compras, precoKg, v => dec(v), l => reais(valor(l)))} />
-        <Colunas t="Compras mês a mês" s="R$" itens={porMes(compras)} />
-        <Barras t="Mortes por categoria" s="cabeças" itens={porCategoria(de_('MORTE'), cab, int)} />
-        <Barras t="Mortes por causa" s="cabeças" itens={causas} />
-        <Barras t="Consumo por categoria" s="cabeças" itens={porCategoria(de_('CONSUMO'), cab, int)} />
-        <Barras t="Vendas internas (entrada)" s="cabeças" itens={porCategoria(de_('VENDA_INT_ENTRADA'), cab, int)} />
-        <Barras t="Vendas internas (saída)" s="cabeças" itens={porCategoria(de_('VENDA_INT_SAIDA'), cab, int)} />
-        {totTouros > 0 && <Barras t="Venda de touros" s="R$ e participação"
-          itens={porCategoria(touros, valor, v => `${reais(v)} · ${dec(v / totTouros * 100, 0)}%`, l => `${int(cab(l))} cab. · ${reais(valor(l) / (cab(l) || 1))} por cabeça`)} />}
-      </div>
-      <p className="suave" style={{ fontSize: '.82rem' }}>Pesos e preços médios são ponderados pelas cabeças e kg de cada lançamento. Passe o mouse ou toque numa barra para ver o detalhe.</p>
+      <Secao t="Vendas">
+        <div className="dash-kpis">
+          <Kpi t="Cabeças comercializadas" v={int(cab(vendas))} />
+          <Kpi t="Preço médio de venda" v={`R$ ${dec(precoKg(vendas))}/kg`} />
+          <Kpi t="Peso médio de venda" v={`${int(pesoMedio(vendas))} kg`} />
+          <Kpi t="Faturamento total" v={reais(valor(vendas))} />
+        </div>
+        <div className="dash-graficos">
+          <Colunas t="Cabeças vendidas por categoria" itens={porCategoria(vendas, cab, int, l => reais(valor(l)))} />
+          <Colunas t="Preço médio por categoria (R$/kg)" itens={porCategoria(vendas, precoKg, v => dec(v), l => reais(valor(l)))} />
+          <Colunas t="Peso médio por categoria (kg)" itens={porCategoria(vendas, pesoMedio, v => int(v), l => `${int(cab(l))} cab.`)} />
+          <Colunas t="Faturamento mês a mês (R$ mil)" itens={porMes(vendas)} />
+          {totTouros > 0 && <Colunas t="Venda de touros: faturamento e % do total" largo
+            itens={porCategoria(touros, valor, compacto, l => `${int(cab(l))} cab. · ${reais(valor(l) / (cab(l) || 1))} por cabeça`)}
+            linha={porCategoria(touros, valor, compacto).map(i => i.valor / totTouros * 100)} />}
+        </div>
+      </Secao>
+
+      <Secao t="Compras">
+        <div className="dash-kpis">
+          <Kpi t="Cabeças compradas" v={int(cab(compras))} />
+          <Kpi t="Preço médio de compra" v={`R$ ${dec(precoKg(compras))}/kg`} />
+          <Kpi t="Peso médio de compra" v={`${int(pesoMedio(compras))} kg`} />
+          <Kpi t="Desembolso total" v={reais(valor(compras))} />
+        </div>
+        <div className="dash-graficos">
+          <Colunas t="Cabeças compradas por categoria" itens={porCategoria(compras, cab, int, l => reais(valor(l)))} />
+          <Colunas t="Preço médio por categoria (R$/kg)" itens={porCategoria(compras, precoKg, v => dec(v), l => reais(valor(l)))} />
+          <Colunas t="Peso médio por categoria (kg)" itens={porCategoria(compras, pesoMedio, v => int(v), l => `${int(cab(l))} cab.`)} />
+          <Colunas t="Desembolso mês a mês (R$ mil)" itens={porMes(compras)} />
+        </div>
+      </Secao>
+
+      <Secao t="Mortes">
+        <div className="dash-kpis">
+          <Kpi t="Total de mortes" v={`${int(cab(mortes))} cab.`} />
+          <Kpi t="Mortes ÷ rebanho inicial" v={`${dec(ini ? cab(mortes) / ini * 100 : 0, 1)}%`} />
+          <Kpi t="Nascimentos" v={`${int(cab(nasc))} cab.`} />
+        </div>
+        <div className="dash-graficos">
+          <Colunas t="Mortes por categoria" itens={porCategoria(mortes, cab, int)} />
+          <Colunas t="Mortes por causa" itens={causas} />
+        </div>
+      </Secao>
+
+      <Secao t="Consumo e vendas internas">
+        <div className="dash-kpis">
+          <Kpi t="Consumo" v={`${int(cab(consumo))} cab.`} />
+          <Kpi t="Vendas internas (entrada)" v={`${int(cab(ent))} cab.`} s={reais(valor(ent))} />
+          <Kpi t="Vendas internas (saída)" v={`${int(cab(sai))} cab.`} s={reais(valor(sai))} />
+        </div>
+        <div className="dash-graficos">
+          <Colunas t="Consumo por categoria" itens={porCategoria(consumo, cab, int)} />
+          <Colunas t="Vendas internas: entrada" itens={porCategoria(ent, cab, int, l => reais(valor(l)))} />
+          <Colunas t="Vendas internas: saída" itens={porCategoria(sai, cab, int, l => reais(valor(l)))} />
+        </div>
+      </Secao>
+      <p className="suave" style={{ fontSize: '.82rem' }}>Pesos e preços médios são ponderados pelas cabeças e kg de cada lançamento. Passe o mouse ou toque numa coluna para ver o detalhe.</p>
     </>
   );
 }
 
-function Tile({ t, v, s }: { t: string; v: string; s: string }) {
-  return <div className="cartao"><small className="suave">{t}</small><div style={{ fontSize: '1.3rem', fontWeight: 700, margin: '2px 0' }}>{v}</div><small className="suave">{s}</small></div>;
+// R$ curto para rótulos de coluna: R$ 2,60 mi · R$ 428 mil · R$ 950
+function compacto(v: number) {
+  const a = Math.abs(v), sinal = v < 0 ? '−' : '';
+  if (a >= 1e6) return `${sinal}R$ ${dec(a / 1e6, 2)} mi`;
+  if (a >= 1e3) return `${sinal}R$ ${int(a / 1e3)} mil`;
+  return `${sinal}R$ ${int(a)}`;
 }
 
-function Barras({ t, s, itens }: { t: string; s: string; itens: Item[] }) {
+function Hero({ t, v, s }: { t: string; v: string; s: string }) {
+  return <div className="hero"><small>{t}</small><strong>{v}</strong><small>{s}</small></div>;
+}
+
+function Kpi({ t, v, s }: { t: string; v: string; s?: string }) {
+  return <div className="kpi"><small className="suave">{t}</small><strong>{v}</strong>{s && <small className="suave">{s}</small>}</div>;
+}
+
+function Secao({ t, children }: { t: string; children: ReactNode }) {
+  return <section className="dash-secao"><h2>{t}</h2>{children}</section>;
+}
+
+// Colunas verticais com o valor em cima de cada uma (como no DASH da planilha).
+// "linha" (opcional) desenha uma linha de % por cima das colunas, com o rótulo do %.
+function Colunas({ t, itens, linha, largo }: { t: string; itens: Item[]; linha?: number[]; largo?: boolean }) {
   const max = Math.max(0, ...itens.map(i => i.valor));
+  const n = itens.length;
   return (
-    <section className="cartao">
-      <h3 style={{ margin: 0 }}>{t}</h3>
-      <small className="suave">{s}</small>
-      {!itens.length && <p className="suave" style={{ marginBottom: 0 }}>Nada no período.</p>}
-      <div className="barras">
-        {itens.map(i => (
-          <div key={i.rotulo} className="barra" title={`${i.rotulo}: ${i.texto}${i.dica ? ' · ' + i.dica : ''}`}>
-            <span className="rot">{i.rotulo}</span>
-            <span className="trilho"><span style={{ width: `${max ? i.valor / max * 100 : 0}%` }} /></span>
-            <span className="val">{i.texto}</span>
+    <div className={`dash-graf${largo ? ' largo' : ''}`}>
+      <h3>{t}</h3>
+      {!itens.some(i => i.valor > 0) ? <p className="suave" style={{ margin: '24px 0' }}>Nada no período.</p> : (
+        <div className="dash-rolagem">
+          <div className="vcols" style={{ minWidth: n * 38 }}>
+            {linha && (
+              <svg className="vlinha" viewBox={`0 0 ${n} 100`} preserveAspectRatio="none" aria-hidden="true">
+                <polyline points={linha.map((p, i) => `${i + 0.5},${100 - p}`).join(' ')} />
+              </svg>
+            )}
+            {itens.map((i, k) => (
+              <div key={i.rotulo + k} className="vcol" title={`${i.rotulo}: ${i.texto}${i.dica ? ' · ' + i.dica : ''}`}>
+                <div className="vtopo">
+                  {linha && <span className="vpct" style={{ bottom: `${linha[k]}%` }}>{dec(linha[k], 0)}%</span>}
+                  <span className="vval">{i.texto}</span>
+                  <div className="vbar" style={{ height: `${max ? i.valor / max * 100 : 0}%` }} />
+                </div>
+                <small className="vrot">{i.rotulo}</small>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function Colunas({ t, s, itens }: { t: string; s: string; itens: Item[] }) {
-  const max = Math.max(1, ...itens.map(i => i.valor));
-  return (
-    <section className="cartao">
-      <h3 style={{ margin: 0 }}>{t}</h3>
-      <small className="suave">{s}</small>
-      <div className="colunas" style={{ height: 150 }}>
-        {itens.map(i => (
-          <div key={i.rotulo} className="col" title={`${i.rotulo}: ${i.texto}${i.dica ? ' · ' + i.dica : ''}`}>
-            <div className="pilha" style={{ height: `${i.valor / max * 100}%` }}><div style={{ flex: 1, background: 'var(--uso-1)' }} /></div>
-            <small>{i.rotulo.slice(0, 3)}</small>
-          </div>
-        ))}
-      </div>
-    </section>
+        </div>
+      )}
+    </div>
   );
 }
