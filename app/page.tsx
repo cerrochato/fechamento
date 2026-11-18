@@ -18,7 +18,9 @@ const ATALHOS = [
 
 export default function Abertura() {
   const { propriedade, sessao } = useApp();
-  const itens = ATALHOS.filter(a => (!a.adm || propriedade.papel === 'adm') && (!a.gerente || propriedade.papel !== 'capataz'));
+  const capataz = propriedade.papel === 'capataz';
+  const itens = ATALHOS.filter(a => capataz ? ['/contagem', '/manual'].includes(a.href)
+    : (!a.adm || propriedade.papel === 'adm'));
   return (
     <Moldura>
       <section className="abertura">
