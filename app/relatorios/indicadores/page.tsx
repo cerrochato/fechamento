@@ -117,7 +117,6 @@ function Conteudo({ base, cats, especies, dias }: { base: Base; cats: Categoria[
     ['Produtividade geral (kg PV/ha)', areaMedia ? dec((pac + eqOv) / areaMedia, 1) : '–', '> 150'],
     ['GMD global rebanho bovino (kg/dia)', rmBov ? dec(pac / rmBov / dias, 3) : '–', '0,291'],
     ...cargas.map(c => [`${c.t}, kg PV/ha · UA/ha`, `${dec(c.kgha, 1)} · ${dec(c.kgha / 450)}`] as [string, string]),
-    ['Natalidade bovinos (nasc. ÷ vacas e vaquilhonas de cria no início)', pct(nascBov, soma(eb, 'estoque_inicial', l => /^(vaca|vaquilhona)( de)? cria$/i.test(l.categoria)))],
   ];
 
   return (
