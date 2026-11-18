@@ -129,7 +129,7 @@ function Lancar() {
       if (editarId) {
         await salvarMovimentacao(base, sessao, editarId);
         if (base.contraparte_nova) await recarregarCadastros();
-        router.push('/lancamentos');
+        router.push(voltar?.startsWith('/') ? voltar : '/lancamentos');
         return;
       }
       if (oc === TROCA) {
@@ -276,7 +276,7 @@ function Lancar() {
         <button className="botao" disabled={!pronto || salvando} onClick={salvar}>
           {salvando ? 'Salvando…' : editarId ? 'Salvar alteração' : 'Salvar lançamento'}
         </button>
-        {editarId && <button className="botao sec" style={{ marginTop: 10 }} onClick={() => router.push('/lancamentos')}>Cancelar</button>}
+        {editarId && <button className="botao sec" style={{ marginTop: 10 }} onClick={() => router.push(voltar?.startsWith('/') ? voltar : '/lancamentos')}>Cancelar</button>}
       </>}
     </Moldura>
   );

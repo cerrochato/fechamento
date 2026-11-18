@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Moldura from '@/components/Moldura';
 import Imprimir from '@/components/Imprimir';
 import { useApp } from '@/lib/contexto';
@@ -8,12 +9,23 @@ import { confirmarTransferencia, excluirMovimentacao, hoje, mesesAntes, moviment
 import { dataBR, int, reais } from '@/lib/formato';
 import type { Movimentacao, Potreiro } from '@/lib/tipos';
 
-export default function Lancamentos() {
+export default function Pagina() {
+  return <Suspense fallback={null}><Lancamentos /></Suspense>;
+}
+
+function Lancamentos() {
+  // período e tipo ficam no endereço: depois de editar um lançamento, volta na mesma seleção
+  const sp = useSearchParams();
+  const router = useRouter();
+  const caminho = usePathname();
   const { propriedade, propriedades, cad } = useApp();
   const { todas } = useApp();
-  const [de, setDe] = useState(mesesAntes(hoje(), 3));
-  const [ate, setAte] = useState(hoje());
-  const [filtro, setFiltro] = useState('');
+  const [de, setDe] = useState(sp.get('de') || mesesAntes(hoje(), 3));
+  const [ate, setAte] = useState(sp.get('ate') || hoje());
+  const [filtro, setFiltro] = useState(sp.get('tipo') || '');
+  const [foco] = useState(Number(sp.get('foco')) || null);   // o lançamento que acabou de ser editado
+  const aqui = `${caminho}?de=${de}&ate=${ate}${filtro ? '&tipo=' + filtro : ''}`;
+  useEffect(() => { router.replace(aqui, { scroll: false }); }, [aqui]); // eslint-disable-line react-hooks/exhaustive-deps
   const [lista, setLista] = useState<(Movimentacao & { _prop: string; _propId: number })[] | null>(null);
   const [pots, setPots] = useState<Potreiro[]>([]);
   const [confirmar, setConfirmar] = useState<number | null>(null);
@@ -37,6 +49,7 @@ export default function Lancamentos() {
 
   const cat = (id: number) => cad.categorias.find(c => c.id === id);
   const oc = (c: string) => cad.ocorrencias.find(o => o.codigo === c);
+  useEffect(() => { if (lista && foco) document.getElementById(`m${foco}`)?.scrollIntoView({ block: 'center' }); }, [lista]); // eslint-disable-line react-hooks/exhaustive-deps
   const visiveis = (lista ?? []).filter(m => !filtro || m.ocorrencia === filtro);
 
   async function confirmarRecebida(m: Movimentacao) {
@@ -102,7 +115,7 @@ export default function Lancamentos() {
             m.observacao,
           ].filter(Boolean).join(' · ');
           return (
-            <div key={m.id} className="cartao item">
+            <div key={m.id} id={`m${m.id}`} className="cartao item" style={foco === m.id ? { borderColor: 'var(--verde)' } : undefined}>
               <div>
                 <strong>{o?.nome}</strong> · {c?.nome}<br />
                 <small>{dataBR(m.data)}{todas ? ` · ${m._prop}` : ''}{detalhes && ' · ' + detalhes}</small>
@@ -113,7 +126,7 @@ export default function Lancamentos() {
                 : confirmar === m.id
                   ? <span><button className="excluir" onClick={() => excluir(m.id)}>Confirmar</button> · <button className="excluir" style={{ color: 'var(--suave)' }} onClick={() => setConfirmar(null)}>Não</button></span>
                   : <span>
-                      <Link href={`/lancar?editar=${m.id}`} className="excluir" style={{ color: 'var(--verde)' }}>Editar</Link>
+                      <Link href={`/lancar?editar=${m.id}&voltar=${encodeURIComponent(aqui + '&foco=' + m.id)}`} className="excluir" style={{ color: 'var(--verde)' }}>Editar</Link>
                       {' · '}
                       <button className="excluir" onClick={() => setConfirmar(m.id)}>Excluir</button>
                     </span>}</span>
