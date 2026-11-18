@@ -29,10 +29,8 @@ function Lancar() {
   const [potreiro, setPotreiro] = useState('');
   const [contraparte, setContraparte] = useState('');
   const [peso, setPeso] = useState('');
-  const [valorKg, setValorKg] = useState('');
   const [valorTotal, setValorTotal] = useState('');
-  const [porTotal, setPorTotal] = useState(false);      // digita o valor total da venda e o app calcula o R$/kg
-  const [pesoTotal, setPesoTotal] = useState(false);    // digita o peso total (romaneio) em vez do peso médio
+  // compra e venda: digita o peso total (romaneio) e o valor total; o app calcula peso médio e R$/kg
   const [obs, setObs] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null);
@@ -55,9 +53,7 @@ function Lancar() {
       setQtd(String(m.quantidade)); setCausa(m.causa_morte_id ? String(m.causa_morte_id) : '');
       setPotreiro(m.potreiro_id ? String(m.potreiro_id) : '');
       setContraparte(cad.contrapartes.find(c => c.id === m.contraparte_id)?.nome ?? '');
-      setPeso(br(m.peso_medio_kg)); setValorKg(br(m.valor_kg)); setObs(m.observacao ?? '');
-      // abre com o valor total gravado, para não mudar centavos por arredondamento
-      setPesoTotal(false); setPorTotal(m.valor_total != null);
+      setPeso(m.peso_medio_kg ? br(Math.round(Number(m.peso_medio_kg) * m.quantidade * 100) / 100) : ''); setObs(m.observacao ?? '');
       setValorTotal(m.valor_total != null ? Number(m.valor_total).toFixed(2).replace('.', ',') : '');
     });
   }, [editarId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -65,10 +61,6 @@ function Lancar() {
   const cats = cad.categorias.filter(c => c.especie_id === especie && c.nome !== 'Outros');
   const catSel = cad.categorias.find(c => String(c.id) === categoria);
 
-  // peso sugerido da categoria quando ainda não foi digitado
-  useEffect(() => {
-    if (tipo?.exige_valor && catSel?.peso_padrao_kg && !peso && !pesoTotal) setPeso(String(catSel.peso_padrao_kg));
-  }, [categoria]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // aceita "185.000,50", "185000,50" e "185000.50"
   const n = (s: string) => {
@@ -77,17 +69,17 @@ function Lancar() {
     // só ponto: "6.150" e "1.200.000" são milhar; "10.25" é decimal
     return Number(/^\d{1,3}(\.\d{3})+$/.test(t) ? t.replace(/\./g, '') : t) || 0;
   };
-  const quilos = pesoTotal ? n(peso) : n(qtd) * n(peso);
-  const pesoMedio = pesoTotal ? (n(qtd) ? n(peso) / n(qtd) : 0) : n(peso);
-  const total = porTotal ? n(valorTotal) : quilos * n(valorKg);
-  const precoKg = porTotal ? (quilos ? total / quilos : 0) : n(valorKg);
+  const quilos = n(peso);
+  const pesoMedio = n(qtd) ? quilos / n(qtd) : 0;
+  const total = n(valorTotal);
+  const precoKg = quilos ? total / quilos : 0;
 
   const pronto = data && oc && categoria && n(qtd) > 0
     && (oc !== TROCA || (categoriaPara && categoriaPara !== categoria))
     && (!tipo?.exige_causa || causa);
 
   function limpar() {
-    setQtd(''); setCausa(''); setPotreiro(''); setContraparte(''); setPeso(''); setValorKg(''); setValorTotal(''); setObs('');
+    setQtd(''); setCausa(''); setPotreiro(''); setContraparte(''); setPeso(''); setValorTotal(''); setObs('');
     setCategoria(''); setCategoriaPara('');
   }
 
@@ -200,33 +192,20 @@ function Lancar() {
             <label htmlFor="cp">{oc.startsWith('VENDA') && !oc.endsWith('ENTRADA') ? 'Comprador' : 'Vendedor'}</label>
             <input id="cp" list="contrapartes" value={contraparte} onChange={e => setContraparte(e.target.value)} placeholder="Digite ou escolha" />
             <datalist id="contrapartes">{cad.contrapartes.map(c => <option key={c.id} value={c.nome} />)}</datalist>
-            <div className="chips" style={{ marginTop: 12 }}>
-              <button type="button" className={`chip ${!pesoTotal ? 'sel' : ''}`} onClick={() => { setPesoTotal(false); setPeso(''); }}>Peso médio</button>
-              <button type="button" className={`chip ${pesoTotal ? 'sel' : ''}`} onClick={() => { setPesoTotal(true); setPeso(''); }}>Peso total</button>
-              <span style={{ width: 8 }} />
-              <button type="button" className={`chip ${!porTotal ? 'sel' : ''}`} onClick={() => setPorTotal(false)}>R$ por kg</button>
-              <button type="button" className={`chip ${porTotal ? 'sel' : ''}`} onClick={() => setPorTotal(true)}>Valor total</button>
-            </div>
             <div className="linha">
               <div>
-                <label htmlFor="peso">{pesoTotal ? 'Peso total (kg)' : 'Peso médio (kg)'}</label>
+                <label htmlFor="peso">Peso total (kg)</label>
                 <input id="peso" inputMode="decimal" value={peso} onChange={e => setPeso(e.target.value)} placeholder="0" />
               </div>
               <div>
-                {porTotal ? <>
-                  <label htmlFor="vt">Valor total (R$)</label>
-                  <input id="vt" inputMode="decimal" value={valorTotal} onChange={e => setValorTotal(e.target.value)} placeholder="0,00" />
-                </> : <>
-                  <label htmlFor="vkg">Preço (R$/kg)</label>
-                  <input id="vkg" inputMode="decimal" value={valorKg} onChange={e => setValorKg(e.target.value)} placeholder="0,00" />
-                </>}
+                <label htmlFor="vt">Valor total (R$)</label>
+                <input id="vt" inputMode="decimal" value={valorTotal} onChange={e => setValorTotal(e.target.value)} placeholder="0,00" />
               </div>
             </div>
             {quilos > 0 && (
               <div className="aviso">
-                {int(quilos)} kg no total{pesoTotal && n(qtd) > 0 && <> · {dec(pesoMedio, 1)} kg por cabeça</>}
-                {total > 0 && <> · <strong>{reais(total)}</strong> ({reais(total / (n(qtd) || 1))} por cabeça)</>}
-                {porTotal && precoKg > 0 && <><br />Preço: <strong>{reais(precoKg)} por kg</strong></>}
+                {n(qtd) > 0 && <>Peso médio: <strong>{dec(pesoMedio, 1)} kg</strong> por cabeça</>}
+                {total > 0 && <><br />Preço: <strong>{reais(precoKg)} por kg</strong> · {reais(total / (n(qtd) || 1))} por cabeça</>}
               </div>
             )}
           </>
