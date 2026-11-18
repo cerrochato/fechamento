@@ -3,7 +3,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Moldura from '@/components/Moldura';
 import { useApp } from '@/lib/contexto';
-import { buscarMovimentacao, hoje, potreiros as buscarPotreiros, salvarMovimentacao } from '@/lib/dados';
+import { buscarMovimentacao, hoje, nomesPropriedades, potreiros as buscarPotreiros, salvarMovimentacao } from '@/lib/dados';
 import { dec, int, reais } from '@/lib/formato';
 import type { NovaMovimentacao, Potreiro } from '@/lib/tipos';
 
@@ -36,10 +36,14 @@ function Lancar() {
   const [valorTotal, setValorTotal] = useState('');
   // compra e venda: digita o peso total (romaneio) e o valor total; o app calcula peso médio e R$/kg
   const [obs, setObs] = useState('');
+  // venda interna: a outra propriedade do app ('' = alguém de fora do app)
+  const [outraProp, setOutraProp] = useState('');
+  const [outras, setOutras] = useState<{ id: number; nome: string }[]>([]);
   const [salvando, setSalvando] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null);
 
   useEffect(() => { buscarPotreiros(propriedade.id).then(setPots); }, [propriedade.id]);
+  useEffect(() => { nomesPropriedades().then(l => setOutras(l.filter(p => p.id !== propriedade.id))).catch(() => setOutras([])); }, [propriedade.id]);
 
   const opcoes = useMemo(() => [
     ...cad.ocorrencias.filter(o => !o.codigo.startsWith('TCAT') || (editarId && o.codigo === oc))
@@ -69,6 +73,7 @@ function Lancar() {
       setData(m.data); setOc(m.ocorrencia); if (cat) setEspecie(cat.especie_id); setCategoria(String(m.categoria_id));
       setQtd(String(m.quantidade)); setCausa(m.causa_morte_id ? String(m.causa_morte_id) : '');
       setPotreiro(m.potreiro_id ? String(m.potreiro_id) : '');
+      setOutraProp(m.propriedade_par_id ? String(m.propriedade_par_id) : '');
       setContraparte(cad.contrapartes.find(c => c.id === m.contraparte_id)?.nome ?? '');
       setPeso(m.peso_medio_kg ? br(Math.round(Number(m.peso_medio_kg) * m.quantidade * 100) / 100) : ''); setObs(m.observacao ?? '');
       setValorTotal(m.valor_total != null ? Number(m.valor_total).toFixed(2).replace('.', ',') : '');
@@ -77,6 +82,9 @@ function Lancar() {
   const tipo = opcoes.find(o => o.codigo === oc);
   const cats = cad.categorias.filter(c => c.especie_id === especie && c.nome !== 'Outros');
   const catSel = cad.categorias.find(c => String(c.id) === categoria);
+  const interna = oc.startsWith('VENDA_INT_');
+  const entrada = oc === 'VENDA_INT_ENTRADA';
+  const nomeOutra = outras.find(p => String(p.id) === outraProp)?.nome;
 
 
   // aceita "185.000,50", "185000,50" e "185000.50"
@@ -97,7 +105,7 @@ function Lancar() {
 
   function limpar() {
     setQtd(''); setCausa(''); setPotreiro(''); setContraparte(''); setPeso(''); setValorTotal(''); setObs('');
-    setCategoria(''); setCategoriaPara('');
+    setCategoria(''); setCategoriaPara(''); setOutraProp('');
   }
 
   async function salvar() {
@@ -112,8 +120,9 @@ function Lancar() {
         valor_kg: precoKg ? Math.round(precoKg * 10000) / 10000 : null,
         valor_total: tipo?.exige_valor && total ? Math.round(total * 100) / 100 : null,
         observacao: obs.trim() || null,
+        propriedade_par_id: interna && outraProp ? Number(outraProp) : null,
       };
-      if (tipo?.exige_valor && contraparte.trim()) {
+      if (tipo?.exige_valor && contraparte.trim() && !(interna && outraProp)) {
         const existente = cad.contrapartes.find(c => c.nome.toUpperCase() === contraparte.trim().toUpperCase());
         if (existente) base.contraparte_id = existente.id; else base.contraparte_nova = contraparte.trim();
       }
@@ -132,7 +141,8 @@ function Lancar() {
       if (base.contraparte_nova) await recarregarCadastros();
       if (voltar?.startsWith('/')) { router.push(voltar); return; }
       const nomeCat = catSel?.nome ?? '';
-      setMsg({ ok: true, texto: `Salvo: ${tipo?.nome} de ${int(base.quantidade)} ${nomeCat}.` });
+      setMsg({ ok: true, texto: `Salvo: ${tipo?.nome} de ${int(base.quantidade)} ${nomeCat}.` +
+        (interna && nomeOutra ? ` A ${entrada ? 'saída' : 'entrada'} em ${nomeOutra} foi criada e espera o gerente de lá confirmar.` : '') });
       limpar();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e) {
@@ -213,11 +223,28 @@ function Lancar() {
           </>
         )}
 
+        {interna && outras.length > 0 && (
+          <>
+            <label htmlFor="outra">{entrada ? 'Os animais vêm de' : 'Os animais vão para'}</label>
+            <select id="outra" value={outraProp} disabled={!!editarId} onChange={e => setOutraProp(e.target.value)}>
+              <option value="">Alguém de fora do app</option>
+              {outras.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+            </select>
+            {outraProp && !editarId && (
+              <p className="suave" style={{ fontSize: '.85rem', margin: '4px 0 0' }}>
+                O app cria sozinho a {entrada ? 'saída' : 'entrada'} em {nomeOutra}. Lá ela fica a confirmar até o gerente escolher o potreiro. Não precisa lançar de novo na outra propriedade.
+              </p>
+            )}
+          </>
+        )}
+
         {tipo?.exige_valor && (
           <>
+            {!(interna && outraProp) && <>
             <label htmlFor="cp">{oc.startsWith('VENDA') && !oc.endsWith('ENTRADA') ? 'Comprador' : 'Vendedor'}</label>
             <input id="cp" list="contrapartes" value={contraparte} onChange={e => setContraparte(e.target.value)} placeholder="Digite ou escolha" />
             <datalist id="contrapartes">{cad.contrapartes.map(c => <option key={c.id} value={c.nome} />)}</datalist>
+            </>}
             <div className="linha">
               <div>
                 <label htmlFor="peso">Peso total (kg)</label>

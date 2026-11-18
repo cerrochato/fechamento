@@ -23,9 +23,12 @@ export interface Movimentacao {
   valor_total: number | null;
   observacao: string | null;
   origem?: string;
+  propriedade_par_id?: number | null;   // venda interna: a outra propriedade do app
+  par_id?: number | null;               // a outra ponta da transferência
+  confirmar?: boolean;                  // criada sozinha pela outra propriedade; o gerente confirma
 }
 
-export type NovaMovimentacao = Omit<Movimentacao, 'id' | 'contraparte_id'> & {
+export type NovaMovimentacao = Omit<Movimentacao, 'id' | 'contraparte_id' | 'par_id' | 'confirmar'> & {
   contraparte_id: number | null;
   contraparte_nova?: string;  // nome digitado que ainda não existe no cadastro
 };

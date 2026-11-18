@@ -283,8 +283,29 @@ export async function salvarMovimentacao(m: NovaMovimentacao, s: Sessao, id?: nu
       d.contraparte.push({ id, nome: contraparte_nova.toUpperCase() });
       linha.contraparte_id = id;
     }
-    if (id) Object.assign(d.movimentacao_rebanho.find((x: Movimentacao) => x.id === id), linha);
-    else d.movimentacao_rebanho.push({ ...linha, id: Date.now(), origem: 'app' });
+    // imita o banco (SQL 13): a venda interna para outra propriedade do app cria a outra ponta
+    const ms: Movimentacao[] = d.movimentacao_rebanho;
+    const iguais = (x: Movimentacao) => ({ data: x.data, categoria_id: x.categoria_id, quantidade: x.quantidade,
+      peso_medio_kg: x.peso_medio_kg, valor_kg: x.valor_kg, valor_total: x.valor_total });
+    if (id) {
+      const atual = ms.find(x => x.id === id)!;
+      Object.assign(atual, linha);
+      const par = ms.find(x => x.id === atual.par_id);
+      if (par) Object.assign(par, iguais(atual));
+    } else {
+      const nova: Movimentacao = { ...linha, contraparte_id: linha.contraparte_id, id: Date.now(), origem: 'app' };
+      ms.push(nova);
+      if (nova.ocorrencia.startsWith('VENDA_INT_') && nova.propriedade_par_id && nova.propriedade_par_id !== nova.propriedade_id) {
+        const origem = d.propriedade.find((p: { id: number }) => p.id === nova.propriedade_id)?.nome ?? '';
+        const entrada = nova.ocorrencia === 'VENDA_INT_ENTRADA';
+        const par: Movimentacao = { ...nova, ...iguais(nova), id: nova.id + 1, propriedade_id: nova.propriedade_par_id,
+          ocorrencia: entrada ? 'VENDA_INT_SAIDA' : 'VENDA_INT_ENTRADA', potreiro_id: null, contraparte_id: null, causa_morte_id: null,
+          observacao: `Criado automaticamente pela transferência ${entrada ? 'para' : 'de'} ${origem}`,
+          propriedade_par_id: nova.propriedade_id, par_id: nova.id, confirmar: true };
+        nova.par_id = par.id;
+        ms.push(par);
+      }
+    }
     guardarDemo();
     return;
   }
@@ -300,11 +321,35 @@ export async function salvarMovimentacao(m: NovaMovimentacao, s: Sessao, id?: nu
 export async function excluirMovimentacao(id: number): Promise<void> {
   if (DEMO) {
     const d = await seed();
-    d.movimentacao_rebanho = d.movimentacao_rebanho.filter((m: Movimentacao) => m.id !== id);
+    const par = d.movimentacao_rebanho.find((m: Movimentacao) => m.id === id)?.par_id;
+    d.movimentacao_rebanho = d.movimentacao_rebanho.filter((m: Movimentacao) => m.id !== id && m.id !== par);
     guardarDemo();
     return;
   }
   ok(await supabase().from('movimentacao_rebanho').delete().eq('id', id));
+}
+
+// Nomes de todas as propriedades do app (para escolher a outra ponta da venda interna)
+export async function nomesPropriedades(): Promise<{ id: number; nome: string }[]> {
+  if (DEMO) return (await seed()).propriedade.map((p: { id: number; nome: string }) => ({ id: p.id, nome: p.nome }));
+  return ok(await supabase().rpc('propriedades_nomes')) as { id: number; nome: string }[];
+}
+
+// Transferências criadas sozinhas pela outra propriedade, esperando o gerente confirmar
+export async function transferenciasAConfirmar(propriedadeId: number): Promise<Movimentacao[]> {
+  if (DEMO) return (await seed()).movimentacao_rebanho.filter((m: Movimentacao) => m.propriedade_id === propriedadeId && m.confirmar);
+  return ok(await supabase().from('movimentacao_rebanho').select('*')
+    .eq('propriedade_id', propriedadeId).eq('confirmar', true).order('data'));
+}
+
+export async function confirmarTransferencia(id: number, potreiroId: number | null): Promise<void> {
+  if (DEMO) {
+    const m = (await seed()).movimentacao_rebanho.find((x: Movimentacao) => x.id === id);
+    if (m) { m.potreiro_id = potreiroId; m.confirmar = false; }
+    guardarDemo();
+    return;
+  }
+  ok(await supabase().from('movimentacao_rebanho').update({ potreiro_id: potreiroId, confirmar: false }).eq('id', id));
 }
 
 // ---------------------------------------------------------------------------

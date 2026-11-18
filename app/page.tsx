@@ -1,7 +1,9 @@
 'use client';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import Moldura from '@/components/Moldura';
 import { useApp } from '@/lib/contexto';
+import { transferenciasAConfirmar } from '@/lib/dados';
 
 // Tela de abertura: o logo da estância e um atalho para cada parte do app
 const ATALHOS = [
@@ -19,6 +21,11 @@ const ATALHOS = [
 export default function Abertura() {
   const { propriedade, sessao } = useApp();
   const capataz = propriedade.papel === 'capataz';
+  const [aConfirmar, setAConfirmar] = useState(0);
+  useEffect(() => {
+    if (capataz) { setAConfirmar(0); return; }
+    transferenciasAConfirmar(propriedade.id).then(l => setAConfirmar(l.length)).catch(() => setAConfirmar(0));
+  }, [propriedade.id, capataz]);
   const itens = ATALHOS.filter(a => capataz ? ['/lancar', '/lancamentos', '/contagem', '/manual'].includes(a.href)
     : (!a.adm || propriedade.papel === 'adm'));
   return (
@@ -27,6 +34,11 @@ export default function Abertura() {
         <img src="/logo-branco.png" alt="Estância Cerro Chato" />
         <p>Olá, {sessao.nome.split(' ')[0]}</p>
       </section>
+      {aConfirmar > 0 && (
+        <Link href="/lancamentos" className="botao" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', margin: '0 0 12px' }}>
+          {aConfirmar === 1 ? '1 transferência' : `${aConfirmar} transferências`} de outra propriedade para confirmar →
+        </Link>
+      )}
       <div className="atalhos">
         {itens.map(a => (
           <Link key={a.href} href={a.href} className="atalho">

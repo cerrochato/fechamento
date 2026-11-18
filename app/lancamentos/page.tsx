@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Moldura from '@/components/Moldura';
 import Imprimir from '@/components/Imprimir';
 import { useApp } from '@/lib/contexto';
-import { excluirMovimentacao, hoje, mesesAntes, movimentacoes, potreiros } from '@/lib/dados';
+import { confirmarTransferencia, excluirMovimentacao, hoje, mesesAntes, movimentacoes, nomesPropriedades, potreiros, transferenciasAConfirmar } from '@/lib/dados';
 import { dataBR, int, reais } from '@/lib/formato';
 import type { Movimentacao, Potreiro } from '@/lib/tipos';
 
@@ -17,9 +17,17 @@ export default function Lancamentos() {
   const [lista, setLista] = useState<(Movimentacao & { _prop: string; _propId: number })[] | null>(null);
   const [pots, setPots] = useState<Potreiro[]>([]);
   const [confirmar, setConfirmar] = useState<number | null>(null);
+  // transferências que a outra propriedade criou aqui e o gerente precisa confirmar
+  const gerente = propriedade.papel !== 'capataz';
+  const [pendentes, setPendentes] = useState<Movimentacao[]>([]);
+  const [potEscolhido, setPotEscolhido] = useState<Record<number, string>>({});
+  const [nomes, setNomes] = useState<{ id: number; nome: string }[]>([]);
+  useEffect(() => { nomesPropriedades().then(setNomes).catch(() => setNomes(propriedades)); }, [propriedades]);
+  const nomeProp = (id?: number | null) => nomes.find(p => p.id === id)?.nome ?? propriedades.find(p => p.id === id)?.nome ?? 'outra propriedade';
 
   const carregar = () => {
     setLista(null);
+    if (gerente) transferenciasAConfirmar(propriedade.id).then(setPendentes); else setPendentes([]);
     const ps = todas ? propriedades : [propriedade];
     Promise.all(ps.map(p => movimentacoes(p.id, de, ate).then(ms => ms.map(m => ({ ...m, _prop: p.nome, _propId: p.id })))))
       .then(rs => setLista(rs.flat().sort((a, b) => b.data.localeCompare(a.data) || b.id - a.id)));
@@ -30,6 +38,12 @@ export default function Lancamentos() {
   const cat = (id: number) => cad.categorias.find(c => c.id === id);
   const oc = (c: string) => cad.ocorrencias.find(o => o.codigo === c);
   const visiveis = (lista ?? []).filter(m => !filtro || m.ocorrencia === filtro);
+
+  async function confirmarRecebida(m: Movimentacao) {
+    const pot = potEscolhido[m.id];
+    await confirmarTransferencia(m.id, pot ? Number(pot) : null);
+    carregar();
+  }
 
   async function excluir(id: number) {
     await excluirMovimentacao(id);
@@ -50,6 +64,29 @@ export default function Lancamentos() {
         {cad.ocorrencias.map(o => <option key={o.codigo} value={o.codigo}>{o.nome}</option>)}
       </select>
 
+      {gerente && pendentes.length > 0 && (
+        <div className="cartao nao-imprime" style={{ borderColor: 'var(--verde)', marginBottom: 14 }}>
+          <strong>Transferências a confirmar em {propriedade.nome}</strong>
+          <p className="suave" style={{ fontSize: '.85rem', margin: '4px 0 8px' }}>
+            Criadas sozinhas quando a outra propriedade lançou a venda interna. Confira e escolha o potreiro.
+          </p>
+          {pendentes.map(m => {
+            const entrada = m.ocorrencia === 'VENDA_INT_ENTRADA';
+            return (
+              <div key={m.id} style={{ borderTop: '1px solid var(--borda)', padding: '10px 0' }}>
+                <div><strong>{entrada ? '+' : '−'}{int(m.quantidade)} {cat(m.categoria_id)?.nome}</strong> · {dataBR(m.data)} · {entrada ? 'vindos de' : 'indo para'} {nomeProp(m.propriedade_par_id)}</div>
+                <label htmlFor={`pc${m.id}`}>{entrada ? 'Para qual potreiro vão' : 'De qual potreiro saem (opcional)'}</label>
+                <select id={`pc${m.id}`} value={potEscolhido[m.id] ?? ''} onChange={e => setPotEscolhido({ ...potEscolhido, [m.id]: e.target.value })}>
+                  <option value="">—</option>
+                  {pots.filter(p => p.propriedade_id === propriedade.id).map(p => <option key={p.id} value={p.id}>{p.codigo}</option>)}
+                </select>
+                <button className="botao" style={{ marginTop: 8 }} disabled={entrada && !potEscolhido[m.id]} onClick={() => confirmarRecebida(m)}>Confirmar</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       <p className="suave">{lista ? `${visiveis.length} lançamento(s)` : 'Carregando…'}</p>
       <div className="lista">
         {visiveis.map(m => {
@@ -59,6 +96,8 @@ export default function Lancamentos() {
             m.causa_morte_id && cad.causas.find(x => x.id === m.causa_morte_id)?.nome,
             m.potreiro_id && 'Potreiro ' + pots.find(p => p.id === m.potreiro_id)?.codigo,
             m.contraparte_id && cad.contrapartes.find(x => x.id === m.contraparte_id)?.nome,
+            m.propriedade_par_id && (m.ocorrencia === 'VENDA_INT_ENTRADA' ? 'de ' : 'para ') + nomeProp(m.propriedade_par_id),
+            m.confirmar && 'a confirmar',
             m.valor_total && reais(Number(m.valor_total)),
             m.observacao,
           ].filter(Boolean).join(' · ');
