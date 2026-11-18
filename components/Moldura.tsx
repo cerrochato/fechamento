@@ -9,7 +9,7 @@ const ITENS = [
   { href: '/lancar', icone: '＋', nome: 'Lançar' },
   { href: '/lancamentos', icone: '☰', nome: 'Histórico' },
   { href: '/contagem', icone: '✓', nome: 'Contagem' },
-  { href: '/efetivo', icone: '▦', nome: 'Efetivo' },
+  { href: '/relatorios', icone: '▦', nome: 'Relatórios', tambem: ['/efetivo'] },
 ];
 
 export default function Moldura({ children, largo }: { children: React.ReactNode; largo?: boolean }) {
@@ -30,7 +30,7 @@ export default function Moldura({ children, largo }: { children: React.ReactNode
       <main className="pagina" style={largo ? { maxWidth: 'none' } : undefined}>{children}</main>
       <nav className="nav">
         {ITENS.map(i => (
-          <Link key={i.href} href={i.href} className={(i.href === '/' ? path === '/' : path.startsWith(i.href)) ? 'ativo' : ''}>
+          <Link key={i.href} href={i.href} className={(i.href === '/' ? path === '/' : [i.href, ...(('tambem' in i && i.tambem) || [])].some(h => path.startsWith(h))) ? 'ativo' : ''}>
             <span aria-hidden>{i.icone}</span>{i.nome}
           </Link>
         ))}

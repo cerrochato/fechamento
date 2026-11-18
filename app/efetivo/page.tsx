@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Moldura from '@/components/Moldura';
+import FiltroPeriodo from '@/components/FiltroPeriodo';
+import Link from 'next/link';
 import { useApp } from '@/lib/contexto';
 import { efetivoPeriodo, hoje, mesesAntes } from '@/lib/dados';
 import { dataBR, int } from '@/lib/formato';
@@ -42,35 +44,11 @@ export default function Efetivo() {
     });
   }, [propriedade.id, propriedades, todas, de, ate]);
 
-  const atalho = (d: string, a: string) => { setDe(d); setAte(a); };
-  const ano = Number(hoje().slice(0, 4));
-  // primeiro e último dia do mês, n meses atrás
-  const mesConta = (n: number) => {
-    const [a, m] = hoje().split('-').map(Number);
-    const ini = new Date(Date.UTC(a, m - 1 - n, 1)), fim = new Date(Date.UTC(a, m - n, 0));
-    return { de: ini.toISOString().slice(0, 10), ate: fim.toISOString().slice(0, 10) };
-  };
-
   return (
     <Moldura>
-      <h1>Efetivo do período</h1>
-      {propriedades.length > 1 && (
-        <div className="chips" style={{ marginBottom: 10 }}>
-          <button className={`chip ${!todas ? 'sel' : ''}`} onClick={() => setTodas(false)}>{propriedade.nome}</button>
-          <button className={`chip ${todas ? 'sel' : ''}`} onClick={() => setTodas(true)}>Todas as propriedades</button>
-        </div>
-      )}
-      <div className="filtros">
-        <div><label htmlFor="de">De</label><input id="de" type="date" value={de} onChange={e => e.target.value && setDe(e.target.value)} /></div>
-        <div><label htmlFor="ate">Até</label><input id="ate" type="date" value={ate} onChange={e => e.target.value && setAte(e.target.value)} /></div>
-      </div>
-      <div className="chips" style={{ marginTop: 10 }}>
-        <button className="chip" onClick={() => atalho(mesConta(1).de, mesConta(1).ate)}>Mês passado</button>
-        <button className="chip" onClick={() => atalho(mesesAntes(hoje(), 3), hoje())}>Últimos 3 meses</button>
-        <button className="chip" onClick={() => atalho(mesesAntes(hoje(), 12), hoje())}>Últimos 12 meses</button>
-        <button className="chip" onClick={() => atalho(`${ano}-01-01`, hoje())}>Este ano</button>
-        <button className="chip" onClick={() => atalho(`${ano - 1}-01-01`, `${ano - 1}-12-31`)}>Ano {ano - 1}</button>
-      </div>
+      <Link href="/relatorios" className="suave">← Relatórios</Link>
+      <h1 style={{ marginTop: 8 }}>Efetivo do período</h1>
+      <FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} todas={todas} setTodas={setTodas} />
 
       {!linhas && <p className="suave">Calculando…</p>}
       {linhas && cad.especies.map(e => {

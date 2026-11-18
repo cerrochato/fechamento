@@ -1,0 +1,30 @@
+'use client';
+import Link from 'next/link';
+import Moldura from '@/components/Moldura';
+
+const RELATORIOS = [
+  { href: '/efetivo', nome: 'Efetivo do período', desc: 'Estoque inicial, entradas, saídas e estoque final por categoria' },
+  { href: '/relatorios/movimentacoes', nome: 'Movimentações', desc: 'Compras, vendas, nascimentos, mortes e consumo, com kg e valores' },
+];
+const EM_BREVE = ['Evolução do rebanho mês a mês', 'Lotação por potreiro e mês a mês', 'Indicadores produtivos'];
+
+export default function Relatorios() {
+  return (
+    <Moldura>
+      <h1>Relatórios</h1>
+      <div className="lista">
+        {RELATORIOS.map(r => (
+          <Link key={r.href} href={r.href} className="cartao item">
+            <div><strong>{r.nome}</strong><br /><small>{r.desc}</small></div>
+            <span aria-hidden>›</span>
+          </Link>
+        ))}
+        {EM_BREVE.map(n => (
+          <div key={n} className="cartao item" style={{ opacity: .55 }}>
+            <div><strong>{n}</strong><br /><small>Em construção</small></div>
+          </div>
+        ))}
+      </div>
+    </Moldura>
+  );
+}
