@@ -21,9 +21,9 @@ export default function Moldura({ children, largo, permiteTodas }: { children: R
   const path = usePathname();
   // aba Financeiro só para o administrador
   const capataz = propriedade.papel === 'capataz';
-  // o capataz só usa a contagem (e o manual); as outras telas ficam fechadas para ele
-  const liberadoCapataz = path === '/' || ['/contagem', '/gravar', '/manual'].some(h => path.startsWith(h));
-  const itens = ITENS.filter(i => capataz ? ['/', '/contagem'].includes(i.href) : (!('fin' in i) || propriedade.papel === 'adm'));
+  // o capataz só usa contagem e lançamentos (e o manual); as outras telas ficam fechadas para ele
+  const liberadoCapataz = path === '/' || ['/contagem', '/gravar', '/manual', '/lancar', '/lancamentos'].some(h => path.startsWith(h));
+  const itens = ITENS.filter(i => capataz ? ['/', '/lancar', '/lancamentos', '/contagem'].includes(i.href) : (!('fin' in i) || propriedade.papel === 'adm'));
   return (
     <>
       <header className="topo nao-imprime">
@@ -40,7 +40,7 @@ export default function Moldura({ children, largo, permiteTodas }: { children: R
       </header>
       <main className="pagina" style={largo ? { maxWidth: 'none' } : undefined}>
         {capataz && !liberadoCapataz
-          ? <div className="cartao"><strong>Tela não disponível</strong><p className="suave" style={{ marginBottom: 0 }}>O capataz usa só a Contagem. <Link href="/contagem">Ir para a Contagem</Link></p></div>
+          ? <div className="cartao"><strong>Tela não disponível</strong><p className="suave" style={{ marginBottom: 0 }}>O capataz usa só a Contagem e os lançamentos. <Link href="/contagem">Ir para a Contagem</Link></p></div>
           : children}
       </main>
       <nav className="nav nao-imprime" style={{ gridTemplateColumns: `repeat(${itens.length}, 1fr)` }}>
