@@ -15,7 +15,7 @@ export default function ResumoFinanceiro() {
   const { propriedade, propriedades, cad } = useApp();
   const [de, setDe] = useState(inicioUltimos(12));
   const [ate, setAte] = useState(hoje());
-  const [todas, setTodas] = useState(false);
+  const { todas } = useApp();
   const [dados, setDados] = useState<{ r: Resumo; contas: ContaFin[]; difInv: number; n: number } | null>(null);
   const ps = (todas ? propriedades : [propriedade]).filter(p => p.papel !== 'capataz');
 
@@ -42,10 +42,10 @@ export default function ResumoFinanceiro() {
   }, [propriedade, propriedades, todas, de, ate]);
 
   return (
-    <Moldura>
+    <Moldura permiteTodas>
       <Link href="/financeiro" className="suave">← Financeiro</Link>
       <h1 style={{ marginTop: 8 }}>Resumo financeiro</h1>
-      <FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} todas={todas} setTodas={setTodas} />
+      <FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} />
       <p className="suave" style={{ fontSize: '.88rem' }}>{todas ? 'Todas as propriedades' : propriedade.nome} · {dataBR(de)} a {dataBR(ate)}</p>
       {!ps.length ? <p>O financeiro é visível só para gerente e administrador.</p>
         : !dados ? <p className="suave">Calculando…</p>

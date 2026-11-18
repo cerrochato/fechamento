@@ -14,8 +14,10 @@ const ITENS = [
   { href: '/financeiro', icone: '$', nome: 'Financeiro', fin: true },
 ];
 
-export default function Moldura({ children, largo }: { children: React.ReactNode; largo?: boolean }) {
-  const { propriedades, propriedade, trocarPropriedade } = useApp();
+// permiteTodas: a tela sabe somar todas as propriedades, então o seletor do topo oferece "Todas as propriedades"
+export default function Moldura({ children, largo, permiteTodas }: { children: React.ReactNode; largo?: boolean; permiteTodas?: boolean }) {
+  const { propriedades, propriedade, trocarPropriedade, todas, setTodas } = useApp();
+  const mostraTodas = permiteTodas && todas;
   const path = usePathname();
   // aba Financeiro só para gerente e adm
   const itens = ITENS.filter(i => !('fin' in i) || propriedade.papel !== 'capataz');
@@ -24,8 +26,10 @@ export default function Moldura({ children, largo }: { children: React.ReactNode
       <header className="topo">
         <strong>Fechamento</strong>
         {propriedades.length > 1 ? (
-          <select aria-label="Propriedade" value={propriedade.id} onChange={e => trocarPropriedade(Number(e.target.value))}>
+          <select aria-label="Propriedade" value={mostraTodas ? 'todas' : propriedade.id}
+            onChange={e => (e.target.value === 'todas' ? setTodas(true) : trocarPropriedade(Number(e.target.value)))}>
             {propriedades.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+            {permiteTodas && <option value="todas">Todas as propriedades</option>}
           </select>
         ) : <span style={{ marginLeft: 'auto' }}>{propriedade.nome}</span>}
         {propriedade.papel !== 'capataz' && <Link href="/cadastros" aria-label="Cadastros" title="Cadastros" style={{ color: 'inherit', fontSize: '1.2rem', textDecoration: 'none' }}>⚙</Link>}

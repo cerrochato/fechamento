@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Moldura from '@/components/Moldura';
-import EscolhaTodas from '@/components/EscolhaTodas';
 import { useApp } from '@/lib/contexto';
 import { estoqueNaData, hoje, mesesAntes, movimentacoes } from '@/lib/dados';
 import { dataBR, int } from '@/lib/formato';
@@ -10,7 +9,7 @@ import type { LinhaEstoque, Movimentacao } from '@/lib/tipos';
 
 export default function Inicio() {
   const { propriedade, propriedades, cad, sessao } = useApp();
-  const [todas, setTodas] = useState(false);
+  const { todas } = useApp();
   const [data, setData] = useState(hoje());
   const [estoque, setEstoque] = useState<LinhaEstoque[] | null>(null);
   const [ultimos, setUltimos] = useState<(Movimentacao & { _prop: string })[]>([]);
@@ -39,9 +38,8 @@ export default function Inicio() {
   const oc = (c: string) => cad.ocorrencias.find(o => o.codigo === c);
 
   return (
-    <Moldura>
+    <Moldura permiteTodas>
       <h1>Olá, {sessao.nome.split(' ')[0]}</h1>
-      <EscolhaTodas todas={todas} setTodas={setTodas} />
       <div className="filtros" style={{ marginBottom: 12 }}>
         <div>
           <label htmlFor="data">Estoque em</label>

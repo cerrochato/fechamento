@@ -43,7 +43,7 @@ export default function Lotacao() {
   const { propriedade, propriedades } = useApp();
   const [de, setDe] = useState(inicioUltimos(12));
   const [ate, setAte] = useState(hoje());
-  const [todas, setTodas] = useState(false);
+  const { todas } = useApp();
   const [mesAMes, setMesAMes] = useState(false);
   const [dados, setDados] = useState<Dados[] | null>(null);
 
@@ -53,11 +53,11 @@ export default function Lotacao() {
   }, [propriedade, propriedades, todas, de, ate]);
 
   return (
-    <Moldura largo={mesAMes}>
+    <Moldura permiteTodas largo={mesAMes}>
       <div style={mesAMes ? { maxWidth: 1400, margin: '0 auto' } : undefined}>
       <Link href="/relatorios" className="suave">← Relatórios</Link>
       <h1 style={{ marginTop: 8 }}>Lotação</h1>
-      <FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} todas={todas} setTodas={setTodas} />
+      <FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} />
       <p className="suave" style={{ fontSize: '.88rem' }}>
         {todas ? 'Todas as propriedades' : propriedade.nome} · {dataBR(de)} a {dataBR(ate)} · estoque teórico no fim de cada mês × peso médio da contagem do mês ÷ área útil de pecuária (Controle de áreas) · 1 UA = {UA} kg
       </p>

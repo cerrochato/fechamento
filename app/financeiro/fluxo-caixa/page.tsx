@@ -17,7 +17,7 @@ export default function FluxoCaixa() {
   const { propriedade, propriedades } = useApp();
   const [de, setDe] = useState(inicioUltimos(12));
   const [ate, setAte] = useState(hoje());
-  const [todas, setTodas] = useState(false);
+  const { todas } = useApp();
   const [dados, setDados] = useState<{ ls: LancFin[]; contas: ContaFin[] } | null>(null);
   const [abertas, setAbertas] = useState<Set<string>>(new Set());
   const ps = (todas ? propriedades : [propriedade]).filter(p => p.papel !== 'capataz');
@@ -32,11 +32,11 @@ export default function FluxoCaixa() {
 
   const meses = mesesDoPeriodo(de, ate).map(m => m.mes.slice(0, 7));
   return (
-    <Moldura largo>
+    <Moldura permiteTodas largo>
       <div style={{ maxWidth: 1400, margin: '0 auto' }}>
         <Link href="/financeiro" className="suave">← Financeiro</Link>
         <h1 style={{ marginTop: 8 }}>Fluxo de caixa</h1>
-        <div style={{ maxWidth: 728 }}><FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} todas={todas} setTodas={setTodas} /></div>
+        <div style={{ maxWidth: 728 }}><FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} /></div>
         <p className="suave" style={{ fontSize: '.88rem' }}>{todas ? 'Todas as propriedades' : propriedade.nome} · {dataBR(de)} a {dataBR(ate)} · valores em R$</p>
         {!ps.length ? <p>O financeiro é visível só para gerente e administrador.</p>
           : !dados ? <p className="suave">Calculando…</p>

@@ -2,7 +2,6 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import Moldura from '@/components/Moldura';
-import EscolhaTodas from '@/components/EscolhaTodas';
 import { useApp } from '@/lib/contexto';
 import { excluirMovimentacao, hoje, mesesAntes, movimentacoes, potreiros } from '@/lib/dados';
 import { dataBR, int, reais } from '@/lib/formato';
@@ -10,7 +9,7 @@ import type { Movimentacao, Potreiro } from '@/lib/tipos';
 
 export default function Lancamentos() {
   const { propriedade, propriedades, cad } = useApp();
-  const [todas, setTodas] = useState(false);
+  const { todas } = useApp();
   const [de, setDe] = useState(mesesAntes(hoje(), 3));
   const [ate, setAte] = useState(hoje());
   const [filtro, setFiltro] = useState('');
@@ -38,9 +37,8 @@ export default function Lancamentos() {
   }
 
   return (
-    <Moldura>
+    <Moldura permiteTodas>
       <h1>Lançamentos</h1>
-      <EscolhaTodas todas={todas} setTodas={setTodas} />
       <div className="filtros">
         <div><label htmlFor="de">De</label><input id="de" type="date" value={de} onChange={e => e.target.value && setDe(e.target.value)} /></div>
         <div><label htmlFor="ate">Até</label><input id="ate" type="date" value={ate} onChange={e => e.target.value && setAte(e.target.value)} /></div>

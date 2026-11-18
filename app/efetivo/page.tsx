@@ -26,7 +26,7 @@ const COLS: { k: keyof LinhaEfetivo; t: string; s: 0 | 1 | -1 }[] = [
 
 export default function Efetivo() {
   const { propriedade, propriedades, cad } = useApp();
-  const [todas, setTodas] = useState(false);   // soma de todas as propriedades que o usuário vê
+  const { todas } = useApp();
   const [de, setDe] = useState(inicioUltimos(12));
   const [ate, setAte] = useState(hoje());
   const [linhas, setLinhas] = useState<LinhaEfetivo[] | null>(null);
@@ -54,10 +54,10 @@ export default function Efetivo() {
   }, [propriedade, propriedades, todas, de, ate]);
 
   return (
-    <Moldura>
+    <Moldura permiteTodas>
       <Link href="/relatorios" className="suave">← Relatórios</Link>
       <h1 style={{ marginTop: 8 }}>Evolução do rebanho</h1>
-      <FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} todas={todas} setTodas={setTodas} />
+      <FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} />
 
       <p className="suave" style={{ fontSize: '.88rem' }}>
         {todas ? 'Todas as propriedades' : propriedade.nome} · {dataBR(de)} a {dataBR(ate)}

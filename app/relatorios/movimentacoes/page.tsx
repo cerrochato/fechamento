@@ -33,7 +33,7 @@ export default function RelMovimentacoes() {
   const { propriedade, propriedades, cad } = useApp();
   const [de, setDe] = useState(inicioUltimos(12));
   const [ate, setAte] = useState(hoje());
-  const [todas, setTodas] = useState(false);
+  const { todas } = useApp();
   const [lista, setLista] = useState<Movimentacao[] | null>(null);
 
   useEffect(() => {
@@ -46,10 +46,10 @@ export default function RelMovimentacoes() {
   const nomeCausa = (id: number | null) => cad.causas.find(c => c.id === id)?.nome ?? 'Sem causa informada';
 
   return (
-    <Moldura>
+    <Moldura permiteTodas>
       <Link href="/relatorios" className="suave">← Relatórios</Link>
       <h1 style={{ marginTop: 8 }}>Movimentações</h1>
-      <FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} todas={todas} setTodas={setTodas} />
+      <FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} />
       <p className="suave" style={{ fontSize: '.88rem' }}>
         {todas ? 'Todas as propriedades' : propriedade.nome} · {dataBR(de)} a {dataBR(ate)}
       </p>

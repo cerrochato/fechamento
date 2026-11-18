@@ -9,6 +9,9 @@ interface Ctx {
   propriedades: Propriedade[];
   propriedade: Propriedade;
   trocarPropriedade: (id: number) => void;
+  // "Todas as propriedades" escolhida no seletor do topo (vale nas telas de consulta)
+  todas: boolean;
+  setTodas: (v: boolean) => void;
   cad: Cadastros;
   recarregarCadastros: () => Promise<void>;
 }
@@ -24,7 +27,9 @@ export function useApp(): Ctx {
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const path = usePathname();
-  const [estado, setEstado] = useState<Omit<Ctx, 'trocarPropriedade' | 'recarregarCadastros'> | null>(null);
+  const [estado, setEstado] = useState<Omit<Ctx, 'trocarPropriedade' | 'recarregarCadastros' | 'todas' | 'setTodas'> | null>(null);
+  const [todas, setTodasEstado] = useState(false);
+  useEffect(() => { try { setTodasEstado(localStorage.getItem('todas') === '1'); } catch { /* ignora */ } }, []);
   const [erro, setErro] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
@@ -69,11 +74,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!p) return;
     try { localStorage.setItem('propriedade', String(id)); } catch { /* ignora */ }
     setEstado({ ...estado, propriedade: p });
+    setTodas(false);
   };
+  function setTodas(v: boolean) {
+    setTodasEstado(v);
+    try { localStorage.setItem('todas', v ? '1' : '0'); } catch { /* ignora */ }
+  }
   const recarregarCadastros = async () => setEstado({ ...estado, cad: await cadastros() });
 
   return (
-    <Contexto.Provider value={{ ...estado, trocarPropriedade, recarregarCadastros }}>
+    <Contexto.Provider value={{ ...estado, trocarPropriedade, recarregarCadastros, todas: todas && estado.propriedades.length > 1, setTodas }}>
       {children}
     </Contexto.Provider>
   );

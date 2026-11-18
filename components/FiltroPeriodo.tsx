@@ -1,6 +1,5 @@
 'use client';
-// Filtro comum dos relatórios: propriedade (esta ou todas) e período livre com atalhos.
-import { useApp } from '@/lib/contexto';
+// Filtro comum dos relatórios: período livre com atalhos. A propriedade (uma ou todas) se escolhe no seletor do topo.
 import { hoje } from '@/lib/dados';
 
 export function mesAtras(n: number) {
@@ -15,21 +14,14 @@ export function inicioUltimos(n: number) {
   return new Date(Date.UTC(a, m - n, 1)).toISOString().slice(0, 10);
 }
 
-export default function FiltroPeriodo({ de, ate, setDe, setAte, todas, setTodas }: {
+export default function FiltroPeriodo({ de, ate, setDe, setAte }: {
   de: string; ate: string; setDe: (v: string) => void; setAte: (v: string) => void;
-  todas: boolean; setTodas: (v: boolean) => void;
+  todas?: boolean; setTodas?: (v: boolean) => void;
 }) {
-  const { propriedade, propriedades } = useApp();
   const ano = Number(hoje().slice(0, 4));
   const atalho = (d: string, a: string) => { setDe(d); setAte(a); };
   return (
     <>
-      {propriedades.length > 1 && (
-        <div className="chips" style={{ marginBottom: 10 }}>
-          <button className={`chip ${!todas ? 'sel' : ''}`} onClick={() => setTodas(false)}>{propriedade.nome}</button>
-          <button className={`chip ${todas ? 'sel' : ''}`} onClick={() => setTodas(true)}>Todas as propriedades</button>
-        </div>
-      )}
       <div className="filtros">
         <div><label htmlFor="de">De</label><input id="de" type="date" value={de} onChange={e => e.target.value && setDe(e.target.value)} /></div>
         <div><label htmlFor="ate">Até</label><input id="ate" type="date" value={ate} onChange={e => e.target.value && setAte(e.target.value)} /></div>
