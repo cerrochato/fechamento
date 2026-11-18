@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import Link from 'next/link';
 import Moldura from '@/components/Moldura';
 import FiltroPeriodo, { inicioUltimos } from '@/components/FiltroPeriodo';
@@ -96,38 +96,51 @@ function Conteudo({ base, cats, especies, dias }: { base: Base; cats: Categoria[
 
   const cargas = base.meses.filter(m => ESTACOES[m.mes.slice(5, 7)]).map(m => {
     const kg = m.kgCarga;
-    return { t: `Carga ${ESTACOES[m.mes.slice(5, 7)]} (${MESES[Number(m.mes.slice(5, 7)) - 1]}/${m.mes.slice(2, 4)})`, kgha: m.areaUtil ? kg / m.areaUtil : 0 };
+    return { t: `Carga ${ESTACOES[m.mes.slice(5, 7)]} (${MESES[Number(m.mes.slice(5, 7)) - 1]}/${m.mes.slice(2, 4)})`, kgha: m.areaUtil ? kg / m.areaUtil : 0, kg, area: m.areaUtil, fim: m.fim };
   });
 
-  const L: [string, string, string?][] = [
-    ['Área utilizada para pecuária (média, ha)', dec(areaMedia, 1)],
-    ['Rebanho médio bovino', dec(rmBov, 1)],
-    ['Rebanho médio ovino', dec(rmOv, 1)],
-    ['Taxa de mortalidade de terneiros', pct(mortCria, nascBov), '2,5%'],
-    ['Taxa de mortalidade de bovinos jovens', pct(mortJov, rmJov), '1%'],
-    ['Taxa de mortalidade de bovinos adultos', pct(mortAdu, rmAdu), '0,8%'],
-    ['Taxa de mortalidade geral de bovinos', pct(soma(eb, 'morte'), rmBov), '2%'],
-    ['Taxa de mortalidade geral de ovinos', pct(soma(eo, 'morte'), rmOv), '5%'],
-    ['Taxa de desfrute de bovinos', pct(soma(eb, 'venda') + soma(eb, 'consumo'), iniBov), '> 30%'],
-    ['Eficiência de estoque de bovinos', pct(pac, kgIni), '> 35%'],
-    ['Produção anual de carne (PAC) bovinos, kg', int(pac)],
-    ['Produtividade bovinos (kg PV/ha)', areaMedia ? dec(pac / areaMedia, 1) : '–', '> 150'],
-    ['Eq. ovinos (kg equivalente bovino)', int(eqOv)],
-    ['PAC geral (ov + bov), kg', int(pac + eqOv)],
-    ['Produtividade geral (kg PV/ha)', areaMedia ? dec((pac + eqOv) / areaMedia, 1) : '–', '> 150'],
-    ['GMD global rebanho bovino (kg/dia)', rmBov ? dec(pac / rmBov / dias, 3) : '–', '0,291'],
-    ...cargas.map(c => [`${c.t}, kg PV/ha · UA/ha`, `${dec(c.kgha, 1)} · ${dec(c.kgha / 450)}`] as [string, string]),
+  const n1 = (x: number) => dec(x, 1), mb = soma(eb, 'morte'), mo = soma(eo, 'morte');
+  const vc = soma(eb, 'venda') + soma(eb, 'consumo');
+  // [indicador, resultado, referência, fórmula com os números do período]
+  const L: [string, string, string, string][] = [
+    ['Área utilizada para pecuária (média, ha)', dec(areaMedia, 1), '', `Média mensal da área total dos potreiros em uso de pecuária (Cadastros › Potreiros e uso das áreas) = ${n1(areaMedia)} ha`],
+    ['Rebanho médio bovino', dec(rmBov, 1), '', `Média dos estoques de bovinos no fim de cada mês (${base.meses.length} meses) = ${n1(rmBov)}`],
+    ['Rebanho médio ovino', dec(rmOv, 1), '', `Média dos estoques de ovinos no fim de cada mês (${base.meses.length} meses) = ${n1(rmOv)}`],
+    ['Taxa de mortalidade de terneiros', pct(mortCria, nascBov), '2,5%', `Mortes de terneiros (M/F) ÷ nascimentos de bovinos = ${int(mortCria)} ÷ ${int(nascBov)}`],
+    ['Taxa de mortalidade de bovinos jovens', pct(mortJov, rmJov), '1%', `Mortes de jovens ÷ rebanho médio de jovens = ${int(mortJov)} ÷ ${n1(rmJov)}. Jovens: categorias 1A e 2A, Vaquilhona cria 15 m, Terneiros 6-12 M`],
+    ['Taxa de mortalidade de bovinos adultos', pct(mortAdu, rmAdu), '0,8%', `Mortes de adultos ÷ rebanho médio de adultos = ${int(mortAdu)} ÷ ${n1(rmAdu)}. Adultos: vacas, vaquilhonas de cria e 3A, touros de cria, 3A e refugo, novilho 3A`],
+    ['Taxa de mortalidade geral de bovinos', pct(mb, rmBov), '2%', `Mortes de bovinos ÷ rebanho médio bovino = ${int(mb)} ÷ ${n1(rmBov)}`],
+    ['Taxa de mortalidade geral de ovinos', pct(mo, rmOv), '5%', `Mortes de ovinos ÷ rebanho médio ovino = ${int(mo)} ÷ ${n1(rmOv)}`],
+    ['Taxa de desfrute de bovinos', pct(vc, iniBov), '> 30%', `(Vendas + consumo) ÷ estoque inicial de bovinos = (${int(soma(eb, 'venda'))} + ${int(soma(eb, 'consumo'))}) ÷ ${int(iniBov)}`],
+    ['Eficiência de estoque de bovinos', pct(pac, kgIni), '> 35%', `PAC bovinos ÷ kg do estoque inicial = ${int(pac)} ÷ ${int(kgIni)}`],
+    ['Produção anual de carne (PAC) bovinos, kg', int(pac), '', `(kg final − kg inicial) + kg vendidos e de vendas internas − kg comprados e de vendas internas recebidas = (${int(kgFim)} − ${int(kgIni)}) + ${int(kgSaiu)} − ${int(kgEntrou)}. Estoque pelo peso de referência; vendas e compras pelo peso informado`],
+    ['Produtividade bovinos (kg PV/ha)', areaMedia ? dec(pac / areaMedia, 1) : '–', '> 150', `PAC bovinos ÷ área de pecuária = ${int(pac)} ÷ ${n1(areaMedia)}`],
+    ['Eq. ovinos (kg equivalente bovino)', int(eqOv), '', `R$ das vendas de ovinos ÷ R$/kg médio das vendas de bovinos = ${dec(valor(movsDe(ov?.id, ['VENDA'])))} ÷ ${precoKg ? dec(precoKg) : '–'}`],
+    ['PAC geral (ov + bov), kg', int(pac + eqOv), '', `PAC bovinos + eq. ovinos = ${int(pac)} + ${int(eqOv)}`],
+    ['Produtividade geral (kg PV/ha)', areaMedia ? dec((pac + eqOv) / areaMedia, 1) : '–', '> 150', `PAC geral ÷ área de pecuária = ${int(pac + eqOv)} ÷ ${n1(areaMedia)}`],
+    ['GMD global rebanho bovino (kg/dia)', rmBov ? dec(pac / rmBov / dias, 3) : '–', '0,291', `PAC bovinos ÷ rebanho médio bovino ÷ dias = ${int(pac)} ÷ ${n1(rmBov)} ÷ ${int(dias)}`],
+    ...cargas.map(c => [`${c.t}, kg PV/ha · UA/ha`, `${dec(c.kgha, 1)} · ${dec(c.kgha / 450)}`, '',
+      `kg do estoque teórico em ${dataBR(c.fim)} (cabeças × peso médio da contagem do mês) ÷ área útil de pecuária = ${int(c.kg)} ÷ ${n1(c.area)}. UA/ha = kg/ha ÷ 450`] as [string, string, string, string]),
   ];
+  const [aberto, setAberto] = useState<string | null>(null);
 
   return (
     <>
       <div className="rolagem">
         <table>
           <thead><tr><th>Indicador</th><th>Resultado</th><th>Referência</th></tr></thead>
-          <tbody>{L.map(([t, v, r]) => <tr key={t}><td>{t}</td><td><strong>{v}</strong></td><td className="suave">{r ?? ''}</td></tr>)}</tbody>
+          <tbody>{L.map(([t, v, r, f]) => (
+            <Fragment key={t}>
+              <tr title={f} onClick={() => setAberto(aberto === t ? null : t)} style={{ cursor: 'pointer' }}>
+                <td style={{ whiteSpace: 'normal', minWidth: 150 }}>{t} <span className="suave" aria-hidden style={{ fontSize: '.8rem' }}>ⓘ</span></td><td><strong>{v}</strong></td><td className="suave">{r}</td>
+              </tr>
+              {aberto === t && <tr><td colSpan={3} className="suave" style={{ fontSize: '.85rem', whiteSpace: 'normal', textAlign: 'left' }}>{f}</td></tr>}
+            </Fragment>
+          ))}</tbody>
         </table>
       </div>
       <div className="suave" style={{ fontSize: '.82rem', marginTop: 10, lineHeight: 1.5 }}>
+        <p style={{ margin: '4px 0' }}>Passe o mouse ou toque em um indicador para ver a fórmula com os números do período.</p>
         <p style={{ margin: '4px 0' }}><strong>Como é calculado (igual à planilha).</strong> Rebanho médio = média dos estoques no fim de cada mês.
           Área = média mensal da área total dos potreiros em uso de pecuária (Controle de áreas); a carga usa a área útil de pecuária do mês.
           Desfrute = (vendas + consumo) ÷ estoque inicial.</p>
