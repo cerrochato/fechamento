@@ -54,7 +54,10 @@ Deno.serve(async (req) => {
     if (!servico.chave) throw new Error('Falta configurar a chave de transcrição (GROQ_API_KEY ou OPENAI_API_KEY) no Supabase.');
     form.append('model', servico.modelo);
     form.append('language', 'pt');
-    form.append('prompt', dica.slice(0, 900));
+    // a Groq aceita no máximo 896 caracteres (contando acentos como bytes); corta com folga
+    let curta = dica;
+    while (new TextEncoder().encode(curta).length > 850) curta = curta.slice(0, -10);
+    form.append('prompt', curta);
     const r = await fetch(servico.url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${servico.chave}` },
