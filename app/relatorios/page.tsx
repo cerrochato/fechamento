@@ -5,6 +5,7 @@ import Moldura from '@/components/Moldura';
 const RELATORIOS = [
   { href: '/relatorios/movimentacoes', nome: 'Movimentações', desc: 'Compras, vendas, nascimentos, mortes e consumo, com kg e valores' },
   { href: '/efetivo', nome: 'Evolução do rebanho', desc: 'Estoque inicial, entradas, saídas e estoque final no período, em cabeças e kg' },
+  { href: '/relatorios/areas', nome: 'Áreas', desc: 'Uso da área (campo nativo, pastagem, arroz…), área de pecuária e lotação' },
   { href: '/relatorios/lotacao', nome: 'Lotação', desc: 'UA/ha e kg/ha da propriedade e de cada potreiro, pelas contagens do período' },
   { href: '/relatorios/indicadores', nome: 'Indicadores produtivos', desc: 'Natalidade, mortalidade, desfrute e kg produzidos por ha' },
 ];

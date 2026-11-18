@@ -156,6 +156,30 @@ export async function areaPecuaria(propriedadeId: number, de: string, ate: strin
   });
 }
 
+// Uso de cada potreiro em cada mês do período (aba "Controle areas")
+export interface UsoPotreiro { mes: string; potreiro_id: number; codigo: string; uso: string; pecuaria: boolean; total: number; util: number }
+export async function usoDasAreas(propriedadeId: number, de: string, ate: string): Promise<UsoPotreiro[]> {
+  const ini = mesesDoPeriodo(de, ate)[0]?.mes ?? de;
+  if (DEMO) {
+    const d = await seed();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pp = new Map<number, any>(d.potreiro.filter((p: Potreiro) => p.propriedade_id === propriedadeId).map((p: Potreiro) => [p.id, p]));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tt = new Map<number, any>(d.tipo_uso_area.map((t: { id: number }) => [t.id, t]));
+    return d.uso_area_mensal.filter((u: { potreiro_id: number; mes: string }) => pp.has(u.potreiro_id) && u.mes >= ini && u.mes <= ate)
+      .map((u: { potreiro_id: number; mes: string; tipo_uso_id: number }) => {
+        const p = pp.get(u.potreiro_id), t = tt.get(u.tipo_uso_id);
+        return { mes: u.mes, potreiro_id: p.id, codigo: p.codigo, uso: t.nome, pecuaria: t.pecuaria, total: Number(p.area_total_ha), util: Number(p.area_util_ha) };
+      });
+  }
+  const r = ok(await supabase().from('uso_area_mensal')
+    .select('mes, potreiro!inner(id, codigo, propriedade_id, area_total_ha, area_util_ha), tipo_uso_area!inner(nome, pecuaria)')
+    .eq('potreiro.propriedade_id', propriedadeId).gte('mes', ini).lte('mes', ate)) as unknown as
+    { mes: string; potreiro: { id: number; codigo: string; area_total_ha: number; area_util_ha: number }; tipo_uso_area: { nome: string; pecuaria: boolean } }[];
+  return r.map(x => ({ mes: x.mes, potreiro_id: x.potreiro.id, codigo: x.potreiro.codigo, uso: x.tipo_uso_area.nome, pecuaria: x.tipo_uso_area.pecuaria,
+    total: Number(x.potreiro.area_total_ha), util: Number(x.potreiro.area_util_ha) }));
+}
+
 // Estoque teórico no fim de cada mês do período
 export async function estoquesMensais(propriedadeId: number, de: string, ate: string): Promise<{ mes: string; fim: string; linhas: LinhaEstoque[] }[]> {
   return Promise.all(mesesDoPeriodo(de, ate).map(async m => ({ ...m, linhas: await estoqueNaData(propriedadeId, m.fim) })));
