@@ -2,9 +2,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Moldura from '@/components/Moldura';
-import FiltroPeriodo from '@/components/FiltroPeriodo';
+import FiltroPeriodo, { inicioUltimos } from '@/components/FiltroPeriodo';
 import { useApp } from '@/lib/contexto';
-import { hoje, mesesAntes, movimentacoes } from '@/lib/dados';
+import { hoje, movimentacoes } from '@/lib/dados';
 import { dataBR, dec, int, reais } from '@/lib/formato';
 import type { Movimentacao } from '@/lib/tipos';
 
@@ -31,7 +31,7 @@ function somar(s: Soma, m: Movimentacao) {
 
 export default function RelMovimentacoes() {
   const { propriedade, propriedades, cad } = useApp();
-  const [de, setDe] = useState(mesesAntes(hoje(), 12));
+  const [de, setDe] = useState(inicioUltimos(12));
   const [ate, setAte] = useState(hoje());
   const [todas, setTodas] = useState(false);
   const [lista, setLista] = useState<Movimentacao[] | null>(null);

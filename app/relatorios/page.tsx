@@ -3,10 +3,10 @@ import Link from 'next/link';
 import Moldura from '@/components/Moldura';
 
 const RELATORIOS = [
-  { href: '/efetivo', nome: 'Efetivo do período', desc: 'Estoque inicial, entradas, saídas e estoque final por categoria' },
+  { href: '/efetivo', nome: 'Evolução do rebanho', desc: 'Estoque inicial, entradas, saídas e estoque final no período, em cabeças e kg' },
   { href: '/relatorios/movimentacoes', nome: 'Movimentações', desc: 'Compras, vendas, nascimentos, mortes e consumo, com kg e valores' },
 ];
-const EM_BREVE = ['Evolução do rebanho mês a mês', 'Lotação por potreiro e mês a mês', 'Indicadores produtivos'];
+const EM_BREVE = ['Lotação por potreiro', 'Indicadores produtivos'];
 
 export default function Relatorios() {
   return (
