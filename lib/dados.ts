@@ -181,22 +181,58 @@ export async function pesosDoMes(propriedadeId: number, de: string, ate: string)
   return r;
 }
 
-// R$/kg de cada categoria para avaliar o rebanho (aba "R-DIFERENÇA DE INVENTÁRIO"),
-// da última safra que começou até a data
-export async function valorKgRebanho(propriedadeId: number, data: string): Promise<Map<number, number>> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let safras: any[], linhas: any[];
+// R$/kg de avaliação do rebanho (aba "R-DIFERENÇA DE INVENTÁRIO"), por categoria e data de vigência
+export interface ValorAvaliacao { categoria_id: number; vigente_desde: string; valor_kg: number }
+
+export async function listarAvaliacao(propriedadeId: number): Promise<ValorAvaliacao[]> {
   if (DEMO) {
     const d = await seed();
-    safras = d.safra; linhas = (d.avaliacao_rebanho ?? []).filter((a: { propriedade_id: number }) => a.propriedade_id === propriedadeId);
-  } else {
-    const sb = supabase();
-    safras = ok(await sb.from('safra').select('id, inicio'));
-    linhas = ok(await sb.from('avaliacao_rebanho').select('safra_id, categoria_id, valor_kg').eq('propriedade_id', propriedadeId));
+    if (!d.avaliacao_valor) {   // demo: copia os valores por safra, valendo desde o início da safra
+      d.avaliacao_valor = (d.avaliacao_rebanho ?? []).filter((x: { valor_kg: number | null }) => x.valor_kg != null)
+        .map((x: { propriedade_id: number; safra_id: number; categoria_id: number; valor_kg: number }) => ({
+          propriedade_id: x.propriedade_id, categoria_id: x.categoria_id, valor_kg: x.valor_kg,
+          vigente_desde: d.safra.find((s: { id: number }) => s.id === x.safra_id).inicio }));
+    }
+    return d.avaliacao_valor.filter((x: { propriedade_id: number }) => x.propriedade_id === propriedadeId);
   }
-  const comValor = safras.filter(s => s.inicio <= data && linhas.some(l => l.safra_id === s.id))
-    .sort((a, b) => b.inicio.localeCompare(a.inicio))[0];
-  return new Map(linhas.filter(l => l.safra_id === comValor?.id && l.valor_kg != null).map(l => [l.categoria_id, Number(l.valor_kg)]));
+  const r = await supabase().from('avaliacao_valor').select('categoria_id, vigente_desde, valor_kg').eq('propriedade_id', propriedadeId);
+  if (!r.error) return (r.data ?? []).map(x => ({ ...x, valor_kg: Number(x.valor_kg) }));
+  // banco sem o arquivo 10: usa a avaliação por safra
+  const sb = supabase();
+  const safras = ok(await sb.from('safra').select('id, inicio')) as { id: number; inicio: string }[];
+  const ls = ok(await sb.from('avaliacao_rebanho').select('safra_id, categoria_id, valor_kg').eq('propriedade_id', propriedadeId)) as { safra_id: number; categoria_id: number; valor_kg: number | null }[];
+  return ls.filter(l => l.valor_kg != null).map(l => ({ categoria_id: l.categoria_id, valor_kg: Number(l.valor_kg), vigente_desde: safras.find(s => s.id === l.safra_id)!.inicio }));
+}
+
+// Valor vigente em cada categoria na data
+export async function valorKgRebanho(propriedadeId: number, data: string): Promise<Map<number, number>> {
+  const m = new Map<number, [string, number]>();
+  for (const v of await listarAvaliacao(propriedadeId)) {
+    if (v.vigente_desde > data) continue;
+    const a = m.get(v.categoria_id);
+    if (!a || v.vigente_desde > a[0]) m.set(v.categoria_id, [v.vigente_desde, v.valor_kg]);
+  }
+  return new Map([...m].map(([k, [, v]]) => [k, v]));
+}
+
+// Grava os valores que valem a partir de uma data (null apaga o valor dessa data)
+export async function salvarAvaliacao(propriedadeId: number, desde: string, valores: Map<number, number | null>, s: Sessao): Promise<void> {
+  if (DEMO) {
+    const d = await seed(); await listarAvaliacao(propriedadeId);
+    for (const [cat, v] of valores) {
+      d.avaliacao_valor = d.avaliacao_valor.filter((x: { propriedade_id: number; categoria_id: number; vigente_desde: string }) =>
+        !(x.propriedade_id === propriedadeId && x.categoria_id === cat && x.vigente_desde === desde));
+      if (v != null) d.avaliacao_valor.push({ propriedade_id: propriedadeId, categoria_id: cat, vigente_desde: desde, valor_kg: v });
+    }
+    guardarDemo();
+    return;
+  }
+  const sb = supabase();
+  const gravar = [...valores].filter(([, v]) => v != null).map(([cat, v]) => ({
+    propriedade_id: propriedadeId, categoria_id: cat, vigente_desde: desde, valor_kg: v, alterado_por: s.usuarioId, alterado_em: new Date().toISOString() }));
+  const apagar = [...valores].filter(([, v]) => v == null).map(([cat]) => cat);
+  if (gravar.length) ok(await sb.from('avaliacao_valor').upsert(gravar));
+  if (apagar.length) ok(await sb.from('avaliacao_valor').delete().eq('propriedade_id', propriedadeId).eq('vigente_desde', desde).in('categoria_id', apagar));
 }
 
 export async function efetivoPeriodo(propriedadeId: number, de: string, ate: string): Promise<LinhaEfetivo[]> {
@@ -475,6 +511,19 @@ export async function salvarCategoria(c: Omit<Categoria, 'id'> & { id?: number }
   }
   const { id, ...campos } = c;
   ok(id ? await supabase().from('categoria_animal').update(campos).eq('id', id) : await supabase().from('categoria_animal').insert(campos));
+}
+
+// Apaga uma categoria que nunca foi usada. Se já tem lançamentos, contagens ou estoque, devolve false (aí só dá para desativar).
+export async function excluirCategoria(id: number): Promise<boolean> {
+  if (DEMO) {
+    const d = await seed();
+    const usada = ['movimentacao_rebanho', 'contagem_campo', 'estoque_inicial'].some(t => (d[t] ?? []).some((x: { categoria_id: number }) => x.categoria_id === id));
+    if (usada) return false;
+    d.categoria_animal = d.categoria_animal.filter((x: Categoria) => x.id !== id); guardarDemo(); return true;
+  }
+  const r = await supabase().from('categoria_animal').delete().eq('id', id);
+  if (r.error?.code === '23503') return false;   // referenciada por outra tabela
+  ok(r); return true;
 }
 
 export async function listarPropriedadesCad(): Promise<PropriedadeCad[]> {

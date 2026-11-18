@@ -8,6 +8,7 @@ export default function Cadastros() {
   const gerente = propriedade.papel !== 'capataz';
   const itens = [
     { href: '/cadastros/potreiros', nome: 'Potreiros', desc: `Áreas e potreiros de ${propriedade.nome}`, pode: gerente },
+    { href: '/cadastros/avaliacao', nome: 'Avaliação do rebanho', desc: 'R$/kg de cada categoria, usado no inventário e no patrimônio', pode: gerente },
     { href: '/cadastros/categorias', nome: 'Categorias de animais', desc: 'Nomes, peso médio e ordem nos relatórios', pode: sessao.adm },
     { href: '/cadastros/propriedades', nome: 'Propriedades', desc: 'Estâncias cadastradas no sistema', pode: sessao.adm },
     { href: '/cadastros/usuarios', nome: 'Usuários e acessos', desc: 'Quem entra no app e o que pode fazer', pode: sessao.adm },

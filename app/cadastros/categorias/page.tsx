@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Moldura from '@/components/Moldura';
 import { useApp } from '@/lib/contexto';
-import { listarCategoriasCad, salvarCategoria } from '@/lib/dados';
+import { excluirCategoria, listarCategoriasCad, salvarCategoria } from '@/lib/dados';
 import type { Categoria } from '@/lib/tipos';
 
 type Cat = Omit<Categoria, 'id'> & { id?: number };
@@ -93,6 +93,17 @@ function Formulario({ c, aoFechar }: { c: Cat; aoFechar: (salvo: boolean) => Pro
         <button className="botao sec" disabled={salvando} style={{ marginTop: 10 }} onClick={() => salvar({ ativa: !c.ativa })}>
           {c.ativa ? 'Desativar categoria' : 'Reativar categoria'}
         </button>
+      )}
+      {c.id && (
+        <button className="excluir" disabled={salvando} style={{ marginTop: 8 }} onClick={async () => {
+          if (!window.confirm(`Excluir a categoria ${c.nome}?`)) return;
+          setSalvando(true); setErro(null);
+          try {
+            if (await excluirCategoria(c.id!)) return aoFechar(true);
+            setErro('Essa categoria já tem lançamentos, contagens ou estoque, então não pode ser apagada sem perder o histórico. Use "Desativar categoria": ela some das listas para lançar, mas continua nos relatórios antigos.');
+          } catch (e) { setErro((e as Error).message); }
+          setSalvando(false);
+        }}>Excluir categoria</button>
       )}
       <button className="excluir" style={{ color: 'var(--suave)', marginTop: 8 }} onClick={() => aoFechar(false)}>Cancelar</button>
     </div>
