@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useApp } from '@/lib/contexto';
 import { excluirLinhaContagem, salvarLinhaContagem } from '@/lib/dados';
-import { int } from '@/lib/formato';
+import { dataBR, int } from '@/lib/formato';
 import type { LinhaContagem, LinhaFechamento, Potreiro } from '@/lib/tipos';
 
 export default function Planilha({ contagemId, data, linhas, pots, fech, editavel, aoMudar }: {
@@ -26,6 +26,10 @@ export default function Planilha({ contagemId, data, linhas, pots, fech, editave
   }, [linhas]);
   const valor = (pid: number | null, cid: number) => (grade.get(`${pid ?? 0}|${cid}`) ?? []).reduce((s, l) => s + l.cabecas, 0);
 
+  // dia da última contagem de cada potreiro (o capataz vai atualizando ao longo do mês)
+  const contadoEm = new Map<number | null, string>();
+  for (const l of linhas) if (l.contado_em && (contadoEm.get(l.potreiro_id) ?? '') < l.contado_em) contadoEm.set(l.potreiro_id, l.contado_em);
+  const inicioMes = data.slice(0, 8) + '01';
   const teorico = new Map((fech ?? []).map(f => [f.categoria_id, Number(f.teorico)]));
   const cats = cad.categorias.filter(c => c.especie_id === especie)
     .filter(c => todasCats || linhas.some(l => l.categoria_id === c.id) || (teorico.get(c.id) ?? 0) !== 0)
@@ -87,7 +91,16 @@ export default function Planilha({ contagemId, data, linhas, pots, fech, editave
                 <th style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--verde-claro)' }}>Contado</th>
                 <th style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--verde-claro)', whiteSpace: 'normal' }}>Saldo teórico</th>
                 <th style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--verde-claro)' }}>Diferença</th>
-                {colunas.map(p => <th key={p.id ?? 'sem'} style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--cartao)', whiteSpace: 'normal', minWidth: 64 }}>{p.nome}</th>)}
+                {colunas.map(p => {
+                  const dia = contadoEm.get(p.id);
+                  return (
+                    <th key={p.id ?? 'sem'} style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--cartao)', whiteSpace: 'normal', minWidth: 64 }}>
+                      {p.nome}
+                      {dia && <div title="Dia em que foi contado" style={{ fontWeight: 400, fontSize: '.72rem', color: dia < inicioMes ? 'var(--saida)' : 'var(--suave)' }}>
+                        {dataBR(dia).slice(0, 5)}</div>}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>

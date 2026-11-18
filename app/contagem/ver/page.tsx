@@ -8,7 +8,7 @@ import Planilha from '@/components/Planilha';
 import { useApp } from '@/lib/contexto';
 import {
   buscarContagem, cargaContagem, excluirLinhaContagem, fechamentoContagem, linhasContagem, listarContagens,
-  mudarStatusContagem, potreiros as buscarPotreiros, salvarLinhaContagem,
+  mudarDataContagem, mudarStatusContagem, potreiros as buscarPotreiros, salvarLinhaContagem,
 } from '@/lib/dados';
 import { dataBR, dec, int, STATUS } from '@/lib/formato';
 import type { Contagem, LinhaCarga, LinhaContagem, LinhaFechamento, Potreiro } from '@/lib/tipos';
@@ -34,11 +34,12 @@ function VerContagem() {
   const [anterior, setAnterior] = useState<{ data: string; dif: Map<number, number> } | null>(null);
   const [carga, setCarga] = useState<LinhaCarga[] | null>(null);
   const [obs, setObs] = useState('');
+  const [dataFech, setDataFech] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     const [cc, ls] = await Promise.all([buscarContagem(id), linhasContagem(id)]);
-    setC(cc); setLinhas(ls); setObs(cc?.observacao ?? '');
+    setC(cc); setLinhas(ls); setObs(cc?.observacao ?? ''); setDataFech(d => d || cc?.data || '');
   }, [id]);
   useEffect(() => { carregar(); buscarPotreiros(propriedade.id).then(setPots); }, [carregar, propriedade.id]);
 
@@ -118,6 +119,15 @@ function VerContagem() {
       {gerente && c.status !== 'fechada' && (
         <div className="cartao" style={{ marginTop: 20 }}>
           <strong>Fechamento</strong>
+          <label htmlFor="dfech">Data da existência</label>
+          <input id="dfech" type="date" value={dataFech} onChange={async e => {
+            const v = e.target.value; if (!v) return;
+            setDataFech(v); await mudarDataContagem(id, v); await carregar();
+          }} />
+          <p className="suave" style={{ fontSize: '.85rem', margin: '4px 0 0' }}>
+            O saldo teórico é calculado nesta data. Se o capataz contou ao longo do mês, use o dia do fechamento (ex.: último dia do mês).
+            Na Planilha, embaixo de cada potreiro aparece o dia em que ele foi contado; em vermelho, os que vieram de um mês anterior e não foram recontados.
+          </p>
           <label htmlFor="obs">Observação do fechamento (opcional)</label>
           <textarea id="obs" value={obs} onChange={e => setObs(e.target.value)}
             placeholder="Ex.: diferença de novilhos conferida no potreiro 42" />

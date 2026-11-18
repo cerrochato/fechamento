@@ -176,22 +176,27 @@ export async function buscarContagem(id: number): Promise<Contagem> {
 // (mesmos potreiros e categorias) para o capataz só corrigir o que mudou.
 export async function criarContagem(propriedadeId: number, data: string, s: Sessao, copiarDe?: number): Promise<number> {
   const anteriores = copiarDe ? await linhasContagem(copiarDe) : [];
+  const dataAnterior = copiarDe ? (await buscarContagem(copiarDe))?.data : null;
   if (DEMO) {
     const d = await seed();
     const id = Math.max(0, ...d.contagem.map((c: Contagem) => c.id)) + 1;
     d.contagem.push({ id, propriedade_id: propriedadeId, data, status: 'rascunho', observacao: null });
     let lid = Math.max(0, ...d.contagem_campo.map((l: LinhaContagem) => l.id));
-    for (const l of anteriores) d.contagem_campo.push({ ...l, id: ++lid, contagem_id: id });
+    for (const l of anteriores) d.contagem_campo.push({ ...l, id: ++lid, contagem_id: id, contado_em: l.contado_em ?? dataAnterior });
     guardarDemo();
     return id;
   }
   const sb = supabase();
   const c = ok(await sb.from('contagem').insert({ propriedade_id: propriedadeId, data, criado_por: s.usuarioId }).select('id').single()) as { id: number };
   if (anteriores.length) {
-    ok(await sb.from('contagem_campo').insert(anteriores.map(l => ({
+    const copia = anteriores.map(l => ({
       contagem_id: c.id, potreiro_id: l.potreiro_id, categoria_id: l.categoria_id,
       cabecas: l.cabecas, peso_medio_kg: l.peso_medio_kg, criado_por: s.usuarioId,
-    }))));
+      contado_em: l.contado_em ?? dataAnterior,   // mantém o dia em que foi contado de fato
+    }));
+    const r = await sb.from('contagem_campo').insert(copia);
+    // banco sem a coluna contado_em (08 ainda não rodado): copia sem ela
+    if (r.error) ok(await sb.from('contagem_campo').insert(copia.map(({ contado_em: _, ...x }) => x)));
   }
   return c.id;
 }
@@ -199,15 +204,15 @@ export async function criarContagem(propriedadeId: number, data: string, s: Sess
 export async function linhasContagem(contagemId: number): Promise<LinhaContagem[]> {
   if (DEMO) return (await seed()).contagem_campo.filter((l: LinhaContagem) => l.contagem_id === contagemId);
   return ok(await supabase().from('contagem_campo')
-    .select('id, contagem_id, potreiro_id, categoria_id, cabecas, peso_medio_kg, observacao')
+    .select('*')
     .eq('contagem_id', contagemId).order('id'));
 }
 
 export async function salvarLinhaContagem(l: Omit<LinhaContagem, 'id'> & { id?: number }, s: Sessao): Promise<void> {
   if (DEMO) {
     const d = await seed();
-    if (l.id) Object.assign(d.contagem_campo.find((x: LinhaContagem) => x.id === l.id), l);
-    else d.contagem_campo.push({ ...l, id: Date.now() });
+    if (l.id) Object.assign(d.contagem_campo.find((x: LinhaContagem) => x.id === l.id), l, { contado_em: hoje() });
+    else d.contagem_campo.push({ ...l, id: Date.now(), contado_em: hoje() });
     guardarDemo();
     return;
   }
@@ -238,6 +243,12 @@ export async function mudarStatusContagem(id: number, status: StatusContagem, s:
     return;
   }
   ok(await supabase().from('contagem').update({ status, ...extra }).eq('id', id));
+}
+
+// O gerente pode acertar o dia da existência ao fechar (ex.: último dia do mês)
+export async function mudarDataContagem(id: number, data: string): Promise<void> {
+  if (DEMO) { (await seed()).contagem.find((x: Contagem) => x.id === id).data = data; guardarDemo(); return; }
+  ok(await supabase().from('contagem').update({ data }).eq('id', id));
 }
 
 export async function fechamentoContagem(id: number): Promise<LinhaFechamento[]> {

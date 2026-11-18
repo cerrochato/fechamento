@@ -52,6 +52,7 @@ export interface Contagem { id: number; propriedade_id: number; data: string; st
 export interface LinhaContagem {
   id: number; contagem_id: number; potreiro_id: number | null; categoria_id: number;
   cabecas: number; peso_medio_kg: number | null; observacao: string | null;
+  contado_em?: string | null;   // dia em que este potreiro/categoria foi contado de fato
 }
 export interface LinhaFechamento {
   categoria_id: number; especie_id: number; categoria: string;
