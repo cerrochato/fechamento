@@ -9,6 +9,7 @@ const ITENS = [
   { href: '/lancar', icone: '＋', nome: 'Lançar' },
   { href: '/lancamentos', icone: '☰', nome: 'Histórico' },
   { href: '/contagem', icone: '✓', nome: 'Contagem' },
+  { href: '/dash', icone: '◧', nome: 'Dash' },
   { href: '/relatorios', icone: '▦', nome: 'Relatórios', tambem: ['/efetivo'] },
 ];
 
