@@ -21,7 +21,7 @@ export default function Login() {
   return (
     <div className="centro">
       <form onSubmit={enviar} className="cartao" style={{ width: '100%', maxWidth: 380, textAlign: 'left' }}>
-        <h1>Fechamento</h1>
+        <img src="/logo.png" alt="Estância Cerro Chato" style={{ display: 'block', width: 200, maxWidth: '70%', margin: '4px auto 18px' }} />
         <p className="suave" style={{ marginTop: 0 }}>Entre com seu e-mail e senha.</p>
         <label htmlFor="email">E-mail</label>
         <input id="email" type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} />

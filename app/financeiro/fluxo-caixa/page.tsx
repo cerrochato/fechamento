@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import Link from 'next/link';
 import Moldura from '@/components/Moldura';
+import Imprimir from '@/components/Imprimir';
 import FiltroPeriodo, { inicioUltimos } from '@/components/FiltroPeriodo';
 import { useApp } from '@/lib/contexto';
 import { contasFinanceiras, hoje, lancamentosFinanceiros, mesesDoPeriodo, type ContaFin, type LancFin } from '@/lib/dados';
@@ -34,8 +35,8 @@ export default function FluxoCaixa() {
   return (
     <Moldura permiteTodas largo>
       <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-        <Link href="/financeiro" className="suave">← Financeiro</Link>
-        <h1 style={{ marginTop: 8 }}>Fluxo de caixa</h1>
+        <Link href="/financeiro" className="suave nao-imprime">← Financeiro</Link>
+        <div className="titulo-rel"><h1 style={{ marginTop: 8 }}>Fluxo de caixa</h1><Imprimir de={de} ate={ate} /></div>
         <div style={{ maxWidth: 728 }}><FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} /></div>
         <p className="suave" style={{ fontSize: '.88rem' }}>{todas ? 'Todas as propriedades' : propriedade.nome} · {dataBR(de)} a {dataBR(ate)} · valores em R$</p>
         {!ps.length ? <p>O financeiro é visível só para gerente e administrador.</p>

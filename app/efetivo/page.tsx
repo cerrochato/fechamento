@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Moldura from '@/components/Moldura';
+import Imprimir from '@/components/Imprimir';
 import FiltroPeriodo, { inicioUltimos } from '@/components/FiltroPeriodo';
 import Link from 'next/link';
 import { useApp } from '@/lib/contexto';
@@ -55,8 +56,8 @@ export default function Efetivo() {
 
   return (
     <Moldura permiteTodas>
-      <Link href="/relatorios" className="suave">← Relatórios</Link>
-      <h1 style={{ marginTop: 8 }}>Evolução do rebanho</h1>
+      <Link href="/relatorios" className="suave nao-imprime">← Relatórios</Link>
+      <div className="titulo-rel"><h1 style={{ marginTop: 8 }}>Evolução do rebanho</h1><Imprimir de={de} ate={ate} /></div>
       <FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} />
 
       <p className="suave" style={{ fontSize: '.88rem' }}>

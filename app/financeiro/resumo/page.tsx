@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Moldura from '@/components/Moldura';
+import Imprimir from '@/components/Imprimir';
 import FiltroPeriodo, { inicioUltimos } from '@/components/FiltroPeriodo';
 import { useApp } from '@/lib/contexto';
 import { contasFinanceiras, efetivoPeriodo, hoje, lancamentosFinanceiros, valorKgRebanho, type ContaFin } from '@/lib/dados';
@@ -43,8 +44,8 @@ export default function ResumoFinanceiro() {
 
   return (
     <Moldura permiteTodas>
-      <Link href="/financeiro" className="suave">← Financeiro</Link>
-      <h1 style={{ marginTop: 8 }}>Resumo financeiro</h1>
+      <Link href="/financeiro" className="suave nao-imprime">← Financeiro</Link>
+      <div className="titulo-rel"><h1 style={{ marginTop: 8 }}>Resumo financeiro</h1><Imprimir de={de} ate={ate} /></div>
       <FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} />
       <p className="suave" style={{ fontSize: '.88rem' }}>{todas ? 'Todas as propriedades' : propriedade.nome} · {dataBR(de)} a {dataBR(ate)}</p>
       {!ps.length ? <p>O financeiro é visível só para gerente e administrador.</p>

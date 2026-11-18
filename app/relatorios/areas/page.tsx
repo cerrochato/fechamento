@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Moldura from '@/components/Moldura';
+import Imprimir from '@/components/Imprimir';
 import FiltroPeriodo, { inicioUltimos } from '@/components/FiltroPeriodo';
 import DashAreas from '@/components/DashAreas';
 import { useApp } from '@/lib/contexto';
@@ -15,8 +16,8 @@ export default function Areas() {
   const { todas } = useApp();
   return (
     <Moldura permiteTodas>
-      <Link href="/relatorios" className="suave">← Relatórios</Link>
-      <h1 style={{ marginTop: 8 }}>Áreas</h1>
+      <Link href="/relatorios" className="suave nao-imprime">← Relatórios</Link>
+      <div className="titulo-rel"><h1 style={{ marginTop: 8 }}>Áreas</h1><Imprimir de={de} ate={ate} /></div>
       <FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} />
       <p className="suave" style={{ fontSize: '.88rem' }}>{todas ? 'Todas as propriedades' : propriedade.nome} · {dataBR(de)} a {dataBR(ate)}</p>
       <DashAreas de={de} ate={ate} todas={todas} />

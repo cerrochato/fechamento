@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Moldura from '@/components/Moldura';
+import Imprimir from '@/components/Imprimir';
 import FiltroPeriodo, { inicioUltimos } from '@/components/FiltroPeriodo';
 import { useApp } from '@/lib/contexto';
 import { areaPecuaria, cargaContagem, estoquesMensais, hoje, listarContagens, pesosDoMes, potreiros } from '@/lib/dados';
@@ -55,8 +56,8 @@ export default function Lotacao() {
   return (
     <Moldura permiteTodas largo={mesAMes}>
       <div style={mesAMes ? { maxWidth: 1400, margin: '0 auto' } : undefined}>
-      <Link href="/relatorios" className="suave">← Relatórios</Link>
-      <h1 style={{ marginTop: 8 }}>Lotação</h1>
+      <Link href="/relatorios" className="suave nao-imprime">← Relatórios</Link>
+      <div className="titulo-rel"><h1 style={{ marginTop: 8 }}>Lotação</h1><Imprimir de={de} ate={ate} /></div>
       <FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} />
       <p className="suave" style={{ fontSize: '.88rem' }}>
         {todas ? 'Todas as propriedades' : propriedade.nome} · {dataBR(de)} a {dataBR(ate)} · estoque teórico no fim de cada mês × peso médio da contagem do mês ÷ área útil de pecuária (Controle de áreas) · 1 UA = {UA} kg

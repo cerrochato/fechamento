@@ -21,7 +21,7 @@ export default function FiltroPeriodo({ de, ate, setDe, setAte }: {
   const ano = Number(hoje().slice(0, 4));
   const atalho = (d: string, a: string) => { setDe(d); setAte(a); };
   return (
-    <>
+    <div className="nao-imprime">
       <div className="filtros">
         <div><label htmlFor="de">De</label><input id="de" type="date" value={de} onChange={e => e.target.value && setDe(e.target.value)} /></div>
         <div><label htmlFor="ate">Até</label><input id="ate" type="date" value={ate} onChange={e => e.target.value && setAte(e.target.value)} /></div>
@@ -33,6 +33,6 @@ export default function FiltroPeriodo({ de, ate, setDe, setAte }: {
         <button className="chip" onClick={() => atalho(`${ano}-01-01`, hoje())}>Este ano</button>
         <button className="chip" onClick={() => atalho(`${ano - 1}-01-01`, `${ano - 1}-12-31`)}>Ano {ano - 1}</button>
       </div>
-    </>
+    </div>
   );
 }

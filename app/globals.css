@@ -183,3 +183,31 @@ tr.n3 td:first-child { padding-left:24px; } tr.n4 td:first-child { padding-left:
 .fluxo-par > div { width:40%; max-width:18px; min-height:1px; border-radius:3px 3px 0 0; }
 .fluxo-col:hover .fluxo-par > div { outline:2px solid var(--texto); outline-offset:1px; }
 @media (max-width: 420px) { .nav a { font-size:.64rem; padding-left:0; padding-right:0; overflow:hidden; text-overflow:ellipsis; } }
+
+/* Logo no topo: fica num selo branco para não perder o vinho e o preto sobre o verde */
+.marca { display:flex; align-items:center; background:#fff; border-radius:8px; padding:3px 8px; flex-shrink:0; }
+.marca img { height:30px; width:auto; display:block; }
+.titulo-rel { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+.titulo-rel h1 { margin-bottom:8px; }
+
+/* Impressão / PDF */
+.so-impressao { display:none; }
+@media print {
+  @page { size: A4; margin: 12mm; }
+  :root { --fundo:#fff; --cartao:#fff; --texto:#111; --suave:#555; --borda:#ccc; }
+  body { background:#fff; color:#111; padding:0; font-size:11pt; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .nao-imprime, .topo, .nav, .chips, button, input, select, details > summary::marker { display:none !important; }
+  .so-impressao { display:flex !important; }
+  .pagina, main.pagina { max-width:none !important; padding:0 !important; margin:0 !important; }
+  .cabecalho-pdf { align-items:center; justify-content:space-between; gap:16px; border-bottom:3px solid #6b0a0a; padding-bottom:8px; margin-bottom:12px; }
+  .cabecalho-pdf img { height:56px; width:auto; }
+  .cabecalho-pdf div { display:flex; flex-direction:column; align-items:flex-end; font-size:9.5pt; color:#333; }
+  .titulo-rel h1 { margin-top:0 !important; }
+  .rolagem, .dash-rolagem { overflow:visible !important; }
+  table { font-size:8.5pt; }
+  th, td { padding:4px 6px; }
+  th:first-child, td:first-child { position:static; }
+  .cartao, section, .dash-graf, .hero, tr { break-inside:avoid; }
+  .cartao { box-shadow:none; }
+  a { text-decoration:none; color:inherit; }
+}
