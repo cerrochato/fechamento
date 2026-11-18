@@ -13,6 +13,7 @@ const ATALHOS = [
   { href: '/relatorios', icone: '▦', nome: 'Relatórios', desc: 'Movimentações, evolução, lotação…' },
   { href: '/financeiro', icone: '$', nome: 'Financeiro', desc: 'Resumo, fluxo de caixa, SW Rural', adm: true },
   { href: '/cadastros', icone: '⚙', nome: 'Cadastros', desc: 'Potreiros, categorias, usuários', gerente: true },
+  { href: '/manual', icone: '?', nome: 'Manual', desc: 'Como usar o app, passo a passo' },
 ];
 
 export default function Abertura() {
