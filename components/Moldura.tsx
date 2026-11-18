@@ -12,7 +12,7 @@ const ITENS = [
   { href: '/efetivo', icone: '▦', nome: 'Efetivo' },
 ];
 
-export default function Moldura({ children }: { children: React.ReactNode }) {
+export default function Moldura({ children, largo }: { children: React.ReactNode; largo?: boolean }) {
   const { propriedades, propriedade, trocarPropriedade } = useApp();
   const path = usePathname();
   return (
@@ -27,7 +27,7 @@ export default function Moldura({ children }: { children: React.ReactNode }) {
         {propriedade.papel !== 'capataz' && <Link href="/cadastros" aria-label="Cadastros" title="Cadastros" style={{ color: 'inherit', fontSize: '1.2rem', textDecoration: 'none' }}>⚙</Link>}
         {!DEMO && <button onClick={() => sair()}>Sair</button>}
       </header>
-      <main className="pagina">{children}</main>
+      <main className="pagina" style={largo ? { maxWidth: 'none' } : undefined}>{children}</main>
       <nav className="nav">
         {ITENS.map(i => (
           <Link key={i.href} href={i.href} className={(i.href === '/' ? path === '/' : path.startsWith(i.href)) ? 'ativo' : ''}>

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import Moldura from '@/components/Moldura';
 import AudiosRecebidos from '@/components/AudiosRecebidos';
+import Planilha from '@/components/Planilha';
 import { useApp } from '@/lib/contexto';
 import {
   buscarContagem, cargaContagem, excluirLinhaContagem, fechamentoContagem, linhasContagem, listarContagens,
@@ -25,7 +26,7 @@ function VerContagem() {
   const [c, setC] = useState<Contagem | null>(null);
   const [linhas, setLinhas] = useState<LinhaContagem[]>([]);
   const [pots, setPots] = useState<Potreiro[]>([]);
-  const [aba, setAba] = useState<'lancar' | 'conferencia' | 'potreiros'>('lancar');
+  const [aba, setAba] = useState<'lancar' | 'planilha' | 'conferencia' | 'potreiros'>('lancar');
   const [fech, setFech] = useState<LinhaFechamento[] | null>(null);
   // diferença da última contagem fechada antes desta, para acompanhar o que falta (ou sobra) de uma contagem para outra
   const [anterior, setAnterior] = useState<{ data: string; dif: Map<number, number> } | null>(null);
@@ -40,9 +41,10 @@ function VerContagem() {
   useEffect(() => { carregar(); buscarPotreiros(propriedade.id).then(setPots); }, [carregar, propriedade.id]);
 
   // gerente abre direto na conferência quando a contagem já foi enviada
-  useEffect(() => { if (c && gerente && c.status !== 'rascunho') setAba('conferencia'); }, [c?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (c && gerente && c.status !== 'rascunho') setAba('planilha'); }, [c?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (aba === 'planilha') fechamentoContagem(id).then(setFech);
     if (aba === 'conferencia') {
       setFech(null); fechamentoContagem(id).then(setFech);
       if (c) listarContagens(propriedade.id).then(async l => {
@@ -68,7 +70,7 @@ function VerContagem() {
   }
 
   return (
-    <Moldura>
+    <Moldura largo={aba === 'planilha'}>
       <Link href="/contagem" className="suave">← Contagens</Link>
       <h1 style={{ marginTop: 8 }}>Contagem de {dataBR(c.data)}</h1>
       <p style={{ marginTop: -6 }}>
@@ -80,6 +82,7 @@ function VerContagem() {
       {gerente && (
         <div className="chips" style={{ margin: '12px 0' }}>
           <button className={`chip ${aba === 'lancar' ? 'sel' : ''}`} onClick={() => setAba('lancar')}>Contagem</button>
+          <button className={`chip ${aba === 'planilha' ? 'sel' : ''}`} onClick={() => setAba('planilha')}>Planilha</button>
           <button className={`chip ${aba === 'conferencia' ? 'sel' : ''}`} onClick={() => setAba('conferencia')}>Conferência</button>
           <button className={`chip ${aba === 'potreiros' ? 'sel' : ''}`} onClick={() => setAba('potreiros')}>Carga por potreiro</button>
         </div>
@@ -96,6 +99,7 @@ function VerContagem() {
         <Preenchimento linhas={linhas} pots={pots} editavel={editavel} contagemId={id} aoMudar={carregar} />
       )}
 
+      {aba === 'planilha' && <Planilha contagemId={id} linhas={linhas} pots={pots} fech={fech} editavel={editavel && c.status !== 'fechada'} aoMudar={carregar} />}
       {aba === 'conferencia' && <Conferencia linhas={fech} />}
       {aba === 'potreiros' && <Cargas linhas={carga} />}
 
@@ -115,7 +119,7 @@ function VerContagem() {
           <label htmlFor="obs">Observação do fechamento (opcional)</label>
           <textarea id="obs" value={obs} onChange={e => setObs(e.target.value)}
             placeholder="Ex.: diferença de novilhos conferida no potreiro 42" />
-          <button className="botao" onClick={() => status('fechada', 'Contagem fechada.')}>Fechar contagem</button>
+          <button className="botao" onClick={() => status('fechada', 'Existência fechada.')}>OK, fechar existência</button>
           {c.status === 'enviada' && (
             <button className="botao sec" style={{ marginTop: 10 }}
               onClick={() => status('rascunho', 'Devolvida ao capataz para correção.')}>Devolver ao capataz</button>
