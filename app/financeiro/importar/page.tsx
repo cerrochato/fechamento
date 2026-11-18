@@ -97,7 +97,7 @@ export default function ImportarSW() {
 
   return (
     <Moldura>
-      <Link href="/relatorios" className="suave">← Relatórios</Link>
+      <Link href="/financeiro" className="suave">← Financeiro</Link>
       <h1 style={{ marginTop: 8 }}>Importar do SW Rural</h1>
       <p className="suave" style={{ marginTop: -4 }}>
         No SW Rural, exporte o relatório de contas por grupo de <strong>um mês</strong> em .csv. Aqui, escolha o mês e o arquivo.
@@ -150,7 +150,7 @@ export default function ImportarSW() {
             </table>
           </div>
         )}
-        <p className="suave" style={{ fontSize: '.82rem' }}>Os valores aparecem no <Link href="/relatorios/financeiro">Resumo financeiro</Link> e no <Link href="/relatorios/fluxo-caixa">Fluxo de caixa</Link>.</p>
+        <p className="suave" style={{ fontSize: '.82rem' }}>Os valores aparecem no <Link href="/financeiro/resumo">Resumo financeiro</Link> e no <Link href="/financeiro/fluxo-caixa">Fluxo de caixa</Link>.</p>
       </section>
     </Moldura>
   );

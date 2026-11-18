@@ -11,11 +11,14 @@ const ITENS = [
   { href: '/contagem', icone: '✓', nome: 'Contagem' },
   { href: '/dash', icone: '◧', nome: 'Dash' },
   { href: '/relatorios', icone: '▦', nome: 'Relatórios', tambem: ['/efetivo'] },
+  { href: '/financeiro', icone: '$', nome: 'Financeiro', fin: true },
 ];
 
 export default function Moldura({ children, largo }: { children: React.ReactNode; largo?: boolean }) {
   const { propriedades, propriedade, trocarPropriedade } = useApp();
   const path = usePathname();
+  // aba Financeiro só para gerente e adm
+  const itens = ITENS.filter(i => !('fin' in i) || propriedade.papel !== 'capataz');
   return (
     <>
       <header className="topo">
@@ -29,8 +32,8 @@ export default function Moldura({ children, largo }: { children: React.ReactNode
         {!DEMO && <button onClick={() => sair()}>Sair</button>}
       </header>
       <main className="pagina" style={largo ? { maxWidth: 'none' } : undefined}>{children}</main>
-      <nav className="nav">
-        {ITENS.map(i => (
+      <nav className="nav" style={{ gridTemplateColumns: `repeat(${itens.length}, 1fr)` }}>
+        {itens.map(i => (
           <Link key={i.href} href={i.href} className={(i.href === '/' ? path === '/' : [i.href, ...(('tambem' in i && i.tambem) || [])].some(h => path.startsWith(h))) ? 'ativo' : ''}>
             <span aria-hidden>{i.icone}</span>{i.nome}
           </Link>

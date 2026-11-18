@@ -43,13 +43,13 @@ export default function ResumoFinanceiro() {
 
   return (
     <Moldura>
-      <Link href="/relatorios" className="suave">← Relatórios</Link>
+      <Link href="/financeiro" className="suave">← Financeiro</Link>
       <h1 style={{ marginTop: 8 }}>Resumo financeiro</h1>
       <FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} todas={todas} setTodas={setTodas} />
       <p className="suave" style={{ fontSize: '.88rem' }}>{todas ? 'Todas as propriedades' : propriedade.nome} · {dataBR(de)} a {dataBR(ate)}</p>
       {!ps.length ? <p>O financeiro é visível só para gerente e administrador.</p>
         : !dados ? <p className="suave">Calculando…</p>
-        : !dados.n ? <p className="suave">Nenhum lançamento financeiro no período. <Link href="/relatorios/importar-sw">Importar do SW Rural</Link></p>
+        : !dados.n ? <p className="suave">Nenhum lançamento financeiro no período. <Link href="/financeiro/importar">Importar do SW Rural</Link></p>
         : <Corpo {...dados} />}
     </Moldura>
   );

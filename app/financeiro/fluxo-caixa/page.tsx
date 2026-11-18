@@ -34,13 +34,13 @@ export default function FluxoCaixa() {
   return (
     <Moldura largo>
       <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-        <Link href="/relatorios" className="suave">← Relatórios</Link>
+        <Link href="/financeiro" className="suave">← Financeiro</Link>
         <h1 style={{ marginTop: 8 }}>Fluxo de caixa</h1>
         <div style={{ maxWidth: 728 }}><FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} todas={todas} setTodas={setTodas} /></div>
         <p className="suave" style={{ fontSize: '.88rem' }}>{todas ? 'Todas as propriedades' : propriedade.nome} · {dataBR(de)} a {dataBR(ate)} · valores em R$</p>
         {!ps.length ? <p>O financeiro é visível só para gerente e administrador.</p>
           : !dados ? <p className="suave">Calculando…</p>
-          : !dados.ls.length ? <p className="suave">Nenhum lançamento financeiro no período. <Link href="/relatorios/importar-sw">Importar do SW Rural</Link></p>
+          : !dados.ls.length ? <p className="suave">Nenhum lançamento financeiro no período. <Link href="/financeiro/importar">Importar do SW Rural</Link></p>
           : <Tabela ls={dados.ls} contas={dados.contas} meses={meses} abertas={abertas}
               alternar={c => setAbertas(a => { const n = new Set(a); if (n.has(c)) n.delete(c); else n.add(c); return n; })} />}
       </div>
