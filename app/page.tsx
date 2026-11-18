@@ -2,22 +2,34 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Moldura from '@/components/Moldura';
+import EscolhaTodas from '@/components/EscolhaTodas';
 import { useApp } from '@/lib/contexto';
 import { estoqueNaData, hoje, mesesAntes, movimentacoes } from '@/lib/dados';
 import { dataBR, int } from '@/lib/formato';
 import type { LinhaEstoque, Movimentacao } from '@/lib/tipos';
 
 export default function Inicio() {
-  const { propriedade, cad, sessao } = useApp();
+  const { propriedade, propriedades, cad, sessao } = useApp();
+  const [todas, setTodas] = useState(false);
   const [data, setData] = useState(hoje());
   const [estoque, setEstoque] = useState<LinhaEstoque[] | null>(null);
-  const [ultimos, setUltimos] = useState<Movimentacao[]>([]);
+  const [ultimos, setUltimos] = useState<(Movimentacao & { _prop: string })[]>([]);
 
   useEffect(() => {
     setEstoque(null);
-    estoqueNaData(propriedade.id, data).then(setEstoque);
-    movimentacoes(propriedade.id, mesesAntes(data, 12), data).then(m => setUltimos(m.slice(0, 5)));
-  }, [propriedade.id, data]);
+    const ps = todas ? propriedades : [propriedade];
+    // com todas as propriedades, soma as cabeças de cada categoria
+    Promise.all(ps.map(p => estoqueNaData(p.id, data))).then(rs => {
+      const m = new Map<number, LinhaEstoque>();
+      for (const l of rs.flat()) {
+        const a = m.get(l.categoria_id);
+        m.set(l.categoria_id, a ? { ...a, cabecas: Number(a.cabecas) + Number(l.cabecas) } : { ...l, cabecas: Number(l.cabecas) });
+      }
+      setEstoque([...m.values()]);
+    });
+    Promise.all(ps.map(p => movimentacoes(p.id, mesesAntes(data, 12), data).then(ms => ms.map(x => ({ ...x, _prop: p.nome })))))
+      .then(rs => setUltimos(rs.flat().sort((a, b) => b.data.localeCompare(a.data) || b.id - a.id).slice(0, 5)));
+  }, [propriedade, propriedades, todas, data]);
 
   const porEspecie = cad.especies.map(e => {
     const linhas = (estoque ?? []).filter(l => l.especie_id === e.id && l.cabecas !== 0);
@@ -29,6 +41,7 @@ export default function Inicio() {
   return (
     <Moldura>
       <h1>Olá, {sessao.nome.split(' ')[0]}</h1>
+      <EscolhaTodas todas={todas} setTodas={setTodas} />
       <div className="filtros" style={{ marginBottom: 12 }}>
         <div>
           <label htmlFor="data">Estoque em</label>
@@ -67,7 +80,7 @@ export default function Inicio() {
           const o = oc(m.ocorrencia);
           return (
             <div key={m.id} className="cartao item">
-              <div><strong>{o?.nome}</strong> · {cat(m.categoria_id)}<br /><small>{dataBR(m.data)}</small></div>
+              <div><strong>{o?.nome}</strong> · {cat(m.categoria_id)}<br /><small>{dataBR(m.data)}{todas ? ` · ${m._prop}` : ''}</small></div>
               <div className={`q ${o?.sinal === 1 ? 'e' : 's'}`}>{o?.sinal === 1 ? '+' : '−'}{int(m.quantidade)}</div>
             </div>
           );

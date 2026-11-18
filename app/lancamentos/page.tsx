@@ -2,23 +2,30 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import Moldura from '@/components/Moldura';
+import EscolhaTodas from '@/components/EscolhaTodas';
 import { useApp } from '@/lib/contexto';
 import { excluirMovimentacao, hoje, mesesAntes, movimentacoes, potreiros } from '@/lib/dados';
 import { dataBR, int, reais } from '@/lib/formato';
 import type { Movimentacao, Potreiro } from '@/lib/tipos';
 
 export default function Lancamentos() {
-  const { propriedade, cad } = useApp();
+  const { propriedade, propriedades, cad } = useApp();
+  const [todas, setTodas] = useState(false);
   const [de, setDe] = useState(mesesAntes(hoje(), 3));
   const [ate, setAte] = useState(hoje());
   const [filtro, setFiltro] = useState('');
-  const [lista, setLista] = useState<Movimentacao[] | null>(null);
+  const [lista, setLista] = useState<(Movimentacao & { _prop: string; _propId: number })[] | null>(null);
   const [pots, setPots] = useState<Potreiro[]>([]);
   const [confirmar, setConfirmar] = useState<number | null>(null);
 
-  const carregar = () => { setLista(null); movimentacoes(propriedade.id, de, ate).then(setLista); };
-  useEffect(carregar, [propriedade.id, de, ate]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { potreiros(propriedade.id).then(setPots); }, [propriedade.id]);
+  const carregar = () => {
+    setLista(null);
+    const ps = todas ? propriedades : [propriedade];
+    Promise.all(ps.map(p => movimentacoes(p.id, de, ate).then(ms => ms.map(m => ({ ...m, _prop: p.nome, _propId: p.id })))))
+      .then(rs => setLista(rs.flat().sort((a, b) => b.data.localeCompare(a.data) || b.id - a.id)));
+  };
+  useEffect(carregar, [propriedade, propriedades, todas, de, ate]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { Promise.all(propriedades.map(p => potreiros(p.id))).then(r => setPots(r.flat())); }, [propriedades]);
 
   const cat = (id: number) => cad.categorias.find(c => c.id === id);
   const oc = (c: string) => cad.ocorrencias.find(o => o.codigo === c);
@@ -33,6 +40,7 @@ export default function Lancamentos() {
   return (
     <Moldura>
       <h1>Lançamentos</h1>
+      <EscolhaTodas todas={todas} setTodas={setTodas} />
       <div className="filtros">
         <div><label htmlFor="de">De</label><input id="de" type="date" value={de} onChange={e => e.target.value && setDe(e.target.value)} /></div>
         <div><label htmlFor="ate">Até</label><input id="ate" type="date" value={ate} onChange={e => e.target.value && setAte(e.target.value)} /></div>
@@ -59,11 +67,12 @@ export default function Lancamentos() {
             <div key={m.id} className="cartao item">
               <div>
                 <strong>{o?.nome}</strong> · {c?.nome}<br />
-                <small>{dataBR(m.data)}{detalhes && ' · ' + detalhes}</small>
+                <small>{dataBR(m.data)}{todas ? ` · ${m._prop}` : ''}{detalhes && ' · ' + detalhes}</small>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div className={`q ${o?.sinal === 1 ? 'e' : 's'}`}>{o?.sinal === 1 ? '+' : '−'}{int(m.quantidade)}</div>
-                {confirmar === m.id
+                {m._propId !== propriedade.id ? <small className="suave">troque a propriedade no topo para editar</small>
+                : confirmar === m.id
                   ? <span><button className="excluir" onClick={() => excluir(m.id)}>Confirmar</button> · <button className="excluir" style={{ color: 'var(--suave)' }} onClick={() => setConfirmar(null)}>Não</button></span>
                   : <span>
                       <Link href={`/lancar?editar=${m.id}`} className="excluir" style={{ color: 'var(--verde)' }}>Editar</Link>
