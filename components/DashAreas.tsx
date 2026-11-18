@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useApp } from '@/lib/contexto';
-import { areaPecuaria, estoquesMensais, mesesDoPeriodo, pesosDoMes, usoDasAreas, type UsoPotreiro } from '@/lib/dados';
+import { areaPecuaria, cargaContagem, estoquesMensais, listarContagens, mesesDoPeriodo, pesosDoMes, usoDasAreas, type UsoPotreiro } from '@/lib/dados';
 import { dec, int } from '@/lib/formato';
 
 const UA = 450;
@@ -13,11 +13,23 @@ const ORDEM_USOS = ['CAMPO NATIVO', 'CAMPO NATIVO MELHORADO', 'PASTAGEM CULTIVAD
 const nomeUso = (u: string) => u.charAt(0) + u.slice(1).toLowerCase();
 
 interface Mes { mes: string; porUso: Map<string, number>; areaPec: number; areaUtilPec: number; kg: number; cab: number }
-interface Dados { usos: string[]; meses: Mes[]; potreiros: UsoPotreiro[]; areaTotal: number }
+interface Dados { usos: string[]; meses: Mes[]; potreiros: UsoPotreiro[]; areaTotal: number; lotPot: Map<number, number> }
 
 async function carregar(prop: number, de: string, ate: string) {
-  const [usos, est, areas, pesos] = await Promise.all([usoDasAreas(prop, de, ate), estoquesMensais(prop, de, ate), areaPecuaria(prop, de, ate), pesosDoMes(prop, de, ate)]);
-  return { usos, est, areas, pesos };
+  const [usos, est, areas, pesos, cs] = await Promise.all([usoDasAreas(prop, de, ate), estoquesMensais(prop, de, ate), areaPecuaria(prop, de, ate), pesosDoMes(prop, de, ate), listarContagens(prop)]);
+  // Lotação média por potreiro: última contagem (não rascunho) de cada mês, UA/ha na área útil; meses vazios contam zero
+  const porMes = new Map<string, { id: number; data: string }>();
+  for (const c of cs) {
+    if (c.status === 'rascunho' || c.data < de || c.data > ate) continue;
+    const m = c.data.slice(0, 7), atual = porMes.get(m);
+    if (!atual || c.data > atual.data) porMes.set(m, c);
+  }
+  const cargas = await Promise.all([...porMes.values()].map(c => cargaContagem(c.id)));
+  const soma = new Map<number, number>();
+  for (const carga of cargas) for (const l of carga)
+    if (l.potreiro_id != null && l.area_util_ha) soma.set(l.potreiro_id, (soma.get(l.potreiro_id) ?? 0) + Number(l.quilos) / UA / Number(l.area_util_ha));
+  const lotPot = new Map([...soma].map(([id, v]) => [id, v / (cargas.length || 1)]));
+  return { usos, est, areas, pesos, lotPot, nFotos: cargas.length };
 }
 
 export default function DashAreas({ de, ate, todas }: { de: string; ate: string; todas: boolean }) {
@@ -44,7 +56,9 @@ export default function DashAreas({ de, ate, todas }: { de: string; ate: string;
       });
       const ultimo = meses[meses.length - 1]?.mes;
       const areaTotal = Math.max(0, ...meses.map(m => [...m.porUso.values()].reduce((a, b) => a + b, 0)));
-      setDados({ usos: nomes, meses, potreiros: todosUsos.filter(u => u.mes <= (ultimo ?? ate)), areaTotal });
+      const lotPot = new Map<number, number>();
+      for (const r of rs) if (r.nFotos) for (const id of new Set(r.usos.map(u => u.potreiro_id))) lotPot.set(id, r.lotPot.get(id) ?? 0);
+      setDados({ usos: nomes, meses, potreiros: todosUsos.filter(u => u.mes <= (ultimo ?? ate)), areaTotal, lotPot });
     });
   }, [propriedade, propriedades, todas, de, ate]);
 
@@ -140,12 +154,13 @@ function Painel({ d }: { d: Dados }) {
 
       <section style={{ marginTop: 14 }}>
         <h2>Potreiros</h2>
+        <p className="suave" style={{ fontSize: '.85rem', marginTop: -6 }}>Lotação média pelas contagens de campo do período (última de cada mês); meses sem gado no potreiro contam como zero.</p>
         <div className="rolagem">
           <table>
-            <thead><tr><th>Potreiro</th><th>Área total</th><th>Área útil</th><th>Uso no fim do período</th><th>Mudanças no período</th></tr></thead>
+            <thead><tr><th>Potreiro</th><th>Área total</th><th>Área útil</th><th title="Média das contagens de campo do período (última de cada mês). Meses sem gado no potreiro contam como zero.">Lotação média UA/ha</th><th>Uso no fim do período</th><th>Mudanças no período</th></tr></thead>
             <tbody>
               {pots.map(({ p, mud }) => (
-                <tr key={p.potreiro_id}><td>{p.codigo}</td><td>{dec(p.total, 1)}</td><td>{dec(p.util, 1)}</td>
+                <tr key={p.potreiro_id}><td>{p.codigo}</td><td>{dec(p.total, 1)}</td><td>{dec(p.util, 1)}</td><td>{d.lotPot.has(p.potreiro_id) ? dec(d.lotPot.get(p.potreiro_id)!) : '–'}</td>
                   <td><span className="pino" style={{ background: cor(p.uso) }} />{nomeUso(p.uso)}</td>
                   <td className="suave" style={{ whiteSpace: 'normal' }}>{mud.join(' · ') || '–'}</td></tr>
               ))}
