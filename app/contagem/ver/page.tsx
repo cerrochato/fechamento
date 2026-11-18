@@ -6,11 +6,13 @@ import Moldura from '@/components/Moldura';
 import AudiosRecebidos from '@/components/AudiosRecebidos';
 import { useApp } from '@/lib/contexto';
 import {
-  buscarContagem, cargaContagem, excluirLinhaContagem, fechamentoContagem, linhasContagem,
+  buscarContagem, cargaContagem, excluirLinhaContagem, fechamentoContagem, linhasContagem, listarContagens,
   mudarStatusContagem, potreiros as buscarPotreiros, salvarLinhaContagem,
 } from '@/lib/dados';
 import { dataBR, dec, int, STATUS } from '@/lib/formato';
 import type { Contagem, LinhaCarga, LinhaContagem, LinhaFechamento, Potreiro } from '@/lib/tipos';
+
+const sinal = (n: number) => n === 0 ? '✓' : (n > 0 ? '+' : '') + int(n);
 
 export default function Pagina() {
   return <Suspense fallback={null}><VerContagem /></Suspense>;
@@ -25,6 +27,8 @@ function VerContagem() {
   const [pots, setPots] = useState<Potreiro[]>([]);
   const [aba, setAba] = useState<'lancar' | 'conferencia' | 'potreiros'>('lancar');
   const [fech, setFech] = useState<LinhaFechamento[] | null>(null);
+  // diferença da última contagem fechada antes desta, para acompanhar o que falta (ou sobra) de uma contagem para outra
+  const [anterior, setAnterior] = useState<{ data: string; dif: Map<number, number> } | null>(null);
   const [carga, setCarga] = useState<LinhaCarga[] | null>(null);
   const [obs, setObs] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
@@ -39,9 +43,17 @@ function VerContagem() {
   useEffect(() => { if (c && gerente && c.status !== 'rascunho') setAba('conferencia'); }, [c?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (aba === 'conferencia') { setFech(null); fechamentoContagem(id).then(setFech); }
+    if (aba === 'conferencia') {
+      setFech(null); fechamentoContagem(id).then(setFech);
+      if (c) listarContagens(propriedade.id).then(async l => {
+        const ant = l.filter(x => x.status === 'fechada' && x.id !== id && x.data < c.data).sort((a, b) => b.data.localeCompare(a.data))[0];
+        if (!ant) return setAnterior(null);
+        const f = await fechamentoContagem(ant.id);
+        setAnterior({ data: ant.data, dif: new Map(f.map(x => [x.categoria_id, Number(x.diferenca)])) });
+      });
+    }
     if (aba === 'potreiros') { setCarga(null); cargaContagem(id).then(setCarga); }
-  }, [aba, id, linhas]);
+  }, [aba, id, linhas, c?.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!c) return <Moldura><p className="suave">Carregando…</p></Moldura>;
 
@@ -122,8 +134,14 @@ function VerContagem() {
     return (
       <>
         <p className="suave" style={{ fontSize: '.9rem' }}>
-          Teórico = estoque pelos lançamentos em {dataBR(c!.data)}. Diferença = contado − teórico.
+          Teórico = saldo pelos lançamentos em {dataBR(c!.data)}. Diferença = contado − teórico.
+          {anterior && <> Ant. = diferença na contagem de {dataBR(anterior.data)}.</>}
         </p>
+        <p className="suave" style={{ fontSize: '.85rem', marginTop: -6 }}>
+          A diferença não vira morte nem baixa sozinha: ela segue de uma contagem para a outra até os animais aparecerem
+          ou até alguém lançar a ocorrência (morte, consumo etc.).
+        </p>
+        {anterior && <Resumo linhas={linhas} />}
         {cad.especies.map(e => {
           const ls = linhas.filter(l => l.especie_id === e.id);
           if (!ls.length) return null;
@@ -133,7 +151,7 @@ function VerContagem() {
               <h2>{e.nome}</h2>
               <div className="rolagem">
                 <table>
-                  <thead><tr><th>Categoria</th><th>Teórico</th><th>Contado</th><th>Diferença</th></tr></thead>
+                  <thead><tr><th>Categoria</th><th>Teórico</th><th>Contado</th><th>{anterior ? "Dif." : "Diferença"}</th>{anterior && <th>Ant.</th>}</tr></thead>
                   <tbody>
                     {ls.map(l => (
                       <tr key={l.categoria_id}>
@@ -141,10 +159,12 @@ function VerContagem() {
                         <td className={l.diferenca > 0 ? 'e' : l.diferenca < 0 ? 's' : ''}>
                           {l.diferenca > 0 ? '+' : ''}{l.diferenca ? int(Number(l.diferenca)) : '✓'}
                         </td>
+                        {anterior && <td className="suave">{sinal(anterior.dif.get(l.categoria_id) ?? 0)}</td>}
                       </tr>
                     ))}
                     <tr className="total"><td>Total</td><td>{int(s('teorico'))}</td><td>{int(s('contado'))}</td>
-                      <td>{s('diferenca') > 0 ? '+' : ''}{int(s('diferenca'))}</td></tr>
+                      <td>{s('diferenca') > 0 ? '+' : ''}{int(s('diferenca'))}</td>
+                      {anterior && <td>{sinal(ls.reduce((a, l) => a + (anterior.dif.get(l.categoria_id) ?? 0), 0))}</td>}</tr>
                   </tbody>
                 </table>
               </div>
@@ -152,6 +172,24 @@ function VerContagem() {
           );
         })}
       </>
+    );
+  }
+
+  // O que mudou desde a contagem anterior: animais que faltavam e apareceram, e faltas novas
+  function Resumo({ linhas }: { linhas: LinhaFechamento[] }) {
+    let apareceram = 0, novas = 0;
+    const det: string[] = [];
+    for (const l of linhas) {
+      const antes = anterior!.dif.get(l.categoria_id) ?? 0, agora = Number(l.diferenca);
+      if (antes < 0 && agora > antes) { const n = Math.min(agora, 0) - antes; apareceram += n; det.push(`${n} ${l.categoria}`); }
+      if (agora < 0 && agora < Math.min(antes, 0)) novas += Math.min(antes, 0) - agora;
+    }
+    if (!apareceram && !novas) return null;
+    return (
+      <div className="aviso" style={{ marginBottom: 8 }}>
+        {apareceram > 0 && <div>✓ Apareceram {int(apareceram)} animais que faltavam em {dataBR(anterior!.data)} ({det.slice(0, 4).join(', ')}{det.length > 4 ? '…' : ''}).</div>}
+        {novas > 0 && <div>⚠ {int(novas)} faltas novas desde {dataBR(anterior!.data)}.</div>}
+      </div>
     );
   }
 
