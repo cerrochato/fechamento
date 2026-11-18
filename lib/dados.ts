@@ -735,3 +735,58 @@ export async function lancamentosFinanceiros(propriedadeId: number, de: string, 
   }
   return ls.filter(l => l.mensal || l.data >= de).map(l => ({ ...l, valor: Number(l.valor) }));
 }
+
+// ---------------------------------------------------------------------------
+// Importação do relatório "Contas por grupo" do SW Rural (um mês por arquivo)
+// ---------------------------------------------------------------------------
+
+export interface LinhaSW { codigo: string; nome: string; valor: number }
+export interface ImportacaoSW { id: number; mes: string; arquivo: string; linhas: number; importado_em: string }
+
+// Rótulo guardado em importacao.arquivo: "nome do arquivo [2025-07]"
+const rotuloSW = (arquivo: string, mes: string) => `${arquivo} [${mes.slice(0, 7)}]`;
+const mesDoRotulo = (a: string) => (a.match(/\[(\d{4}-\d{2})\]$/)?.[1] ?? '') + '-01';
+
+export async function importacoesSW(propriedadeId: number): Promise<ImportacaoSW[]> {
+  let ls: { id: number; arquivo: string; linhas: number; importado_em: string }[];
+  if (DEMO) ls = ((await seed()).importacao ?? []).filter((i: { propriedade_id: number; tipo: string }) => i.propriedade_id === propriedadeId && i.tipo === 'sw_rural_contas_grupo');
+  else ls = ok(await supabase().from('importacao').select('id, arquivo, linhas, importado_em').eq('propriedade_id', propriedadeId).eq('tipo', 'sw_rural_contas_grupo'));
+  return ls.map(i => ({ ...i, mes: mesDoRotulo(i.arquivo ?? '') })).filter(i => i.mes.length === 10).sort((a, b) => b.mes.localeCompare(a.mes));
+}
+
+// Grava o mês e só depois apaga a importação anterior do mesmo mês, para não ficar sem dados se algo falhar no meio.
+export async function importarSW(propriedadeId: number, mes: string, arquivo: string, linhas: LinhaSW[], contasNovas: LinhaSW[]) {
+  const novos = linhas.filter(l => Math.abs(l.valor) >= 0.005);
+  const nivel = (c: string) => c.split('.').length;
+  const pai = (c: string) => (nivel(c) > 1 ? c.split('.').slice(0, -1).join('.') : null);
+  const tipo = (c: string) => (c.startsWith('1') ? 'receita' : c.startsWith('2') ? 'despesa' : 'outro');
+  const anteriores = (await importacoesSW(propriedadeId)).filter(i => i.mes === mes).map(i => i.id);
+  if (DEMO) {
+    const d = await seed();
+    d.importacao ??= [];
+    for (const c of contasNovas) d.conta_financeira.push({ codigo: c.codigo, nome: c.nome, nivel: nivel(c.codigo), tipo: tipo(c.codigo), codigo_pai: pai(c.codigo) });
+    const id = Math.max(0, ...d.importacao.map((i: { id: number }) => i.id)) + 1;
+    d.importacao.push({ id, propriedade_id: propriedadeId, tipo: 'sw_rural_contas_grupo', arquivo: rotuloSW(arquivo, mes), linhas: novos.length, importado_em: new Date().toISOString() });
+    let lid = Math.max(0, ...d.lancamento_financeiro.map((l: { id: number }) => l.id));
+    d.lancamento_financeiro = d.lancamento_financeiro.filter((l: { importacao_id?: number }) => !anteriores.includes(l.importacao_id ?? -1));
+    d.importacao = d.importacao.filter((i: { id: number }) => !anteriores.includes(i.id));
+    for (const l of novos) d.lancamento_financeiro.push({ id: ++lid, propriedade_id: propriedadeId, data: mes, mensal: true, conta_codigo: l.codigo, valor: l.valor, importacao_id: id });
+    _contas = null; guardarDemo();
+    return;
+  }
+  const sb = supabase();
+  if (contasNovas.length) {
+    // pais antes dos filhos
+    const cs = [...contasNovas].sort((a, b) => nivel(a.codigo) - nivel(b.codigo));
+    const r = await sb.from('conta_financeira').upsert(cs.map(c => ({ codigo: c.codigo, nome: c.nome, nivel: nivel(c.codigo), tipo: tipo(c.codigo), codigo_pai: pai(c.codigo) })), { onConflict: 'codigo', ignoreDuplicates: true });
+    if (r.error) throw new Error('O arquivo tem contas que ainda não existem no plano de contas, e só o administrador pode criá-las. Peça a um adm para importar este mês.');
+    _contas = null;
+  }
+  const { data: { user } } = await sb.auth.getUser();
+  const imp = ok(await sb.from('importacao').insert({ propriedade_id: propriedadeId, tipo: 'sw_rural_contas_grupo', arquivo: rotuloSW(arquivo, mes), linhas: novos.length, importado_por: user?.id ?? null }).select('id').single()) as { id: number };
+  for (let i = 0; i < novos.length; i += 500) {
+    const r = await sb.from('lancamento_financeiro').insert(novos.slice(i, i + 500).map(l => ({ propriedade_id: propriedadeId, data: mes, mensal: true, conta_codigo: l.codigo, valor: l.valor, importacao_id: imp.id })));
+    if (r.error) { await sb.from('importacao').delete().eq('id', imp.id); throw new Error(r.error.message); }
+  }
+  if (anteriores.length) ok(await sb.from('importacao').delete().in('id', anteriores));
+}

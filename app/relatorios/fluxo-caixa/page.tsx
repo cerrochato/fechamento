@@ -40,7 +40,7 @@ export default function FluxoCaixa() {
         <p className="suave" style={{ fontSize: '.88rem' }}>{todas ? 'Todas as propriedades' : propriedade.nome} · {dataBR(de)} a {dataBR(ate)} · valores em R$</p>
         {!ps.length ? <p>O financeiro é visível só para gerente e administrador.</p>
           : !dados ? <p className="suave">Calculando…</p>
-          : !dados.ls.length ? <p className="suave">Nenhum lançamento financeiro no período.</p>
+          : !dados.ls.length ? <p className="suave">Nenhum lançamento financeiro no período. <Link href="/relatorios/importar-sw">Importar do SW Rural</Link></p>
           : <Tabela ls={dados.ls} contas={dados.contas} meses={meses} abertas={abertas}
               alternar={c => setAbertas(a => { const n = new Set(a); if (n.has(c)) n.delete(c); else n.add(c); return n; })} />}
       </div>

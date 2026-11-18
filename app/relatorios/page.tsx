@@ -11,6 +11,7 @@ const RELATORIOS = [
   { href: '/relatorios/indicadores', nome: 'Indicadores produtivos', desc: 'Mortalidade, desfrute, kg produzidos por ha e carga animal' },
   { href: '/relatorios/financeiro', nome: 'Resumo financeiro', desc: 'Receitas, despesas, desembolso e resultados 1 a 4 no período', fin: true },
   { href: '/relatorios/fluxo-caixa', nome: 'Fluxo de caixa', desc: 'Receitas, despesas e saldo acumulado mês a mês', fin: true },
+  { href: '/relatorios/importar-sw', nome: 'Importar do SW Rural', desc: 'Traz o relatório de contas por grupo de um mês para o financeiro', fin: true },
 ];
 const EM_BREVE: string[] = [];
 
