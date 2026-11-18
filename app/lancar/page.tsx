@@ -23,6 +23,9 @@ export default function Lancar() {
   const [contraparte, setContraparte] = useState('');
   const [peso, setPeso] = useState('');
   const [valorKg, setValorKg] = useState('');
+  const [valorTotal, setValorTotal] = useState('');
+  const [porTotal, setPorTotal] = useState(false);      // digita o valor total da venda e o app calcula o R$/kg
+  const [pesoTotal, setPesoTotal] = useState(false);    // digita o peso total (romaneio) em vez do peso médio
   const [obs, setObs] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null);
@@ -39,19 +42,27 @@ export default function Lancar() {
 
   // peso sugerido da categoria quando ainda não foi digitado
   useEffect(() => {
-    if (tipo?.exige_valor && catSel?.peso_padrao_kg && !peso) setPeso(String(catSel.peso_padrao_kg));
+    if (tipo?.exige_valor && catSel?.peso_padrao_kg && !peso && !pesoTotal) setPeso(String(catSel.peso_padrao_kg));
   }, [categoria]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const n = (s: string) => Number(s.replace(',', '.')) || 0;
-  const quilos = n(qtd) * n(peso);
-  const total = quilos * n(valorKg);
+  // aceita "185.000,50", "185000,50" e "185000.50"
+  const n = (s: string) => {
+    const t = s.trim().replace(/[R$\s]/g, '');
+    if (t.includes(',')) return Number(t.replace(/\./g, '').replace(',', '.')) || 0;
+    // só ponto: "6.150" e "1.200.000" são milhar; "10.25" é decimal
+    return Number(/^\d{1,3}(\.\d{3})+$/.test(t) ? t.replace(/\./g, '') : t) || 0;
+  };
+  const quilos = pesoTotal ? n(peso) : n(qtd) * n(peso);
+  const pesoMedio = pesoTotal ? (n(qtd) ? n(peso) / n(qtd) : 0) : n(peso);
+  const total = porTotal ? n(valorTotal) : quilos * n(valorKg);
+  const precoKg = porTotal ? (quilos ? total / quilos : 0) : n(valorKg);
 
   const pronto = data && oc && categoria && n(qtd) > 0
     && (oc !== TROCA || (categoriaPara && categoriaPara !== categoria))
     && (!tipo?.exige_causa || causa);
 
   function limpar() {
-    setQtd(''); setCausa(''); setPotreiro(''); setContraparte(''); setPeso(''); setValorKg(''); setObs('');
+    setQtd(''); setCausa(''); setPotreiro(''); setContraparte(''); setPeso(''); setValorKg(''); setValorTotal(''); setObs('');
     setCategoria(''); setCategoriaPara('');
   }
 
@@ -63,7 +74,8 @@ export default function Lancar() {
         propriedade_id: propriedade.id, data, categoria_id: Number(categoria), ocorrencia: oc,
         quantidade: Math.round(n(qtd)), causa_morte_id: causa ? Number(causa) : null,
         potreiro_id: potreiro ? Number(potreiro) : null, contraparte_id: null,
-        peso_medio_kg: n(peso) || null, valor_kg: n(valorKg) || null,
+        peso_medio_kg: pesoMedio ? Math.round(pesoMedio * 100) / 100 : null,
+        valor_kg: precoKg ? Math.round(precoKg * 10000) / 10000 : null,
         valor_total: tipo?.exige_valor && total ? Math.round(total * 100) / 100 : null,
         observacao: obs.trim() || null,
       };
@@ -157,19 +169,33 @@ export default function Lancar() {
             <label htmlFor="cp">{oc.startsWith('VENDA') && !oc.endsWith('ENTRADA') ? 'Comprador' : 'Vendedor'}</label>
             <input id="cp" list="contrapartes" value={contraparte} onChange={e => setContraparte(e.target.value)} placeholder="Digite ou escolha" />
             <datalist id="contrapartes">{cad.contrapartes.map(c => <option key={c.id} value={c.nome} />)}</datalist>
+            <div className="chips" style={{ marginTop: 12 }}>
+              <button type="button" className={`chip ${!pesoTotal ? 'sel' : ''}`} onClick={() => { setPesoTotal(false); setPeso(''); }}>Peso médio</button>
+              <button type="button" className={`chip ${pesoTotal ? 'sel' : ''}`} onClick={() => { setPesoTotal(true); setPeso(''); }}>Peso total</button>
+              <span style={{ width: 8 }} />
+              <button type="button" className={`chip ${!porTotal ? 'sel' : ''}`} onClick={() => setPorTotal(false)}>R$ por kg</button>
+              <button type="button" className={`chip ${porTotal ? 'sel' : ''}`} onClick={() => setPorTotal(true)}>Valor total</button>
+            </div>
             <div className="linha">
               <div>
-                <label htmlFor="peso">Peso médio (kg)</label>
+                <label htmlFor="peso">{pesoTotal ? 'Peso total (kg)' : 'Peso médio (kg)'}</label>
                 <input id="peso" inputMode="decimal" value={peso} onChange={e => setPeso(e.target.value)} placeholder="0" />
               </div>
               <div>
-                <label htmlFor="vkg">Preço (R$/kg)</label>
-                <input id="vkg" inputMode="decimal" value={valorKg} onChange={e => setValorKg(e.target.value)} placeholder="0,00" />
+                {porTotal ? <>
+                  <label htmlFor="vt">Valor total (R$)</label>
+                  <input id="vt" inputMode="decimal" value={valorTotal} onChange={e => setValorTotal(e.target.value)} placeholder="0,00" />
+                </> : <>
+                  <label htmlFor="vkg">Preço (R$/kg)</label>
+                  <input id="vkg" inputMode="decimal" value={valorKg} onChange={e => setValorKg(e.target.value)} placeholder="0,00" />
+                </>}
               </div>
             </div>
             {quilos > 0 && (
               <div className="aviso">
-                {int(quilos)} kg no total{total > 0 && <> · <strong>{reais(total)}</strong> ({reais(total / n(qtd))} por cabeça)</>}
+                {int(quilos)} kg no total{pesoTotal && n(qtd) > 0 && <> · {dec(pesoMedio, 1)} kg por cabeça</>}
+                {total > 0 && <> · <strong>{reais(total)}</strong> ({reais(total / (n(qtd) || 1))} por cabeça)</>}
+                {porTotal && precoKg > 0 && <><br />Preço: <strong>{reais(precoKg)} por kg</strong></>}
               </div>
             )}
           </>
