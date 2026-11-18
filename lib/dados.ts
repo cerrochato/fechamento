@@ -108,6 +108,79 @@ export async function estoqueNaData(propriedadeId: number, data: string): Promis
   return ok(await supabase().rpc('estoque_na_data', { p_propriedade: propriedadeId, p_data: data }));
 }
 
+// Meses do período: para cada mês, o último dia (ou a data final, se o mês não terminou)
+export function mesesDoPeriodo(de: string, ate: string): { mes: string; fim: string }[] {
+  const r: { mes: string; fim: string }[] = [];
+  let [a, m] = de.split('-').map(Number);
+  for (;;) {
+    const mes = `${a}-${String(m).padStart(2, '0')}-01`;
+    if (mes > ate) break;
+    const ult = new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10);
+    r.push({ mes, fim: ult < ate ? ult : ate });
+    m++; if (m > 12) { m = 1; a++; }
+  }
+  return r;
+}
+
+// Área de pecuária de cada mês (aba "Controle areas"): soma dos potreiros cujo uso no mês
+// conta como pecuária. total = área total, util = área útil. Mês sem uso informado usa
+// todos os potreiros ativos.
+export async function areaPecuaria(propriedadeId: number, de: string, ate: string): Promise<{ mes: string; total: number; util: number }[]> {
+  const meses = mesesDoPeriodo(de, ate);
+  let usos: { mes: string; total: number; util: number }[];
+  let pots: { area_total_ha: number; area_util_ha: number }[];
+  if (DEMO) {
+    const d = await seed();
+    const tipos = new Set(d.tipo_uso_area.filter((t: { pecuaria: boolean }) => t.pecuaria).map((t: { id: number }) => t.id));
+    const pp = new Map<number, Potreiro & { area_total_ha: number }>(d.potreiro.filter((p: Potreiro) => p.propriedade_id === propriedadeId).map((p: Potreiro) => [p.id, p]));
+    usos = d.uso_area_mensal.filter((u: { potreiro_id: number; tipo_uso_id: number }) => pp.has(u.potreiro_id) && tipos.has(u.tipo_uso_id))
+      .map((u: { potreiro_id: number; mes: string }) => ({ mes: u.mes, total: Number(pp.get(u.potreiro_id)!.area_total_ha), util: Number(pp.get(u.potreiro_id)!.area_util_ha) }));
+    pots = [...pp.values()].filter(p => p.ativo);
+  } else {
+    const sb = supabase();
+    const [u, p] = await Promise.all([
+      sb.from('uso_area_mensal').select('mes, potreiro!inner(propriedade_id, area_total_ha, area_util_ha), tipo_uso_area!inner(pecuaria)')
+        .eq('potreiro.propriedade_id', propriedadeId).eq('tipo_uso_area.pecuaria', true)
+        .gte('mes', meses[0]?.mes ?? de).lte('mes', ate),
+      sb.from('potreiro').select('area_total_ha, area_util_ha').eq('propriedade_id', propriedadeId).eq('ativo', true),
+    ]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    usos = ((u.data ?? []) as any[]).map(x => ({ mes: x.mes, total: Number(x.potreiro.area_total_ha), util: Number(x.potreiro.area_util_ha) }));
+    pots = ok(p);
+  }
+  const todosT = pots.reduce((s, x) => s + Number(x.area_total_ha), 0), todosU = pots.reduce((s, x) => s + Number(x.area_util_ha), 0);
+  return meses.map(({ mes }) => {
+    const us = usos.filter(x => x.mes === mes);
+    return us.length ? { mes, total: us.reduce((s, x) => s + x.total, 0), util: us.reduce((s, x) => s + x.util, 0) }
+      : { mes, total: todosT, util: todosU };
+  });
+}
+
+// Estoque teórico no fim de cada mês do período
+export async function estoquesMensais(propriedadeId: number, de: string, ate: string): Promise<{ mes: string; fim: string; linhas: LinhaEstoque[] }[]> {
+  return Promise.all(mesesDoPeriodo(de, ate).map(async m => ({ ...m, linhas: await estoqueNaData(propriedadeId, m.fim) })));
+}
+
+// Peso médio de cada categoria na contagem de campo de cada mês (última enviada ou fechada do mês).
+// A planilha usa esses pesos do mês para a carga; sem contagem, fica o peso de referência.
+export async function pesosDoMes(propriedadeId: number, de: string, ate: string): Promise<Map<string, Map<number, number>>> {
+  const meses = mesesDoPeriodo(de, ate);
+  const cs = (await listarContagens(propriedadeId)).filter(c => c.status !== 'rascunho' && c.data >= (meses[0]?.mes ?? de) && c.data <= ate);
+  const r = new Map<string, Map<number, number>>();
+  await Promise.all(meses.map(async ({ mes }) => {
+    const c = cs.filter(x => x.data.slice(0, 7) === mes.slice(0, 7)).sort((a, b) => b.data.localeCompare(a.data))[0];
+    if (!c) return;
+    const soma = new Map<number, [number, number]>();
+    for (const l of await linhasContagem(c.id)) {
+      if (!l.peso_medio_kg || !l.cabecas) continue;
+      const a = soma.get(l.categoria_id) ?? [0, 0];
+      soma.set(l.categoria_id, [a[0] + l.cabecas * Number(l.peso_medio_kg), a[1] + l.cabecas]);
+    }
+    r.set(mes, new Map([...soma].map(([k, [kg, cab]]) => [k, kg / cab])));
+  }));
+  return r;
+}
+
 export async function efetivoPeriodo(propriedadeId: number, de: string, ate: string): Promise<LinhaEfetivo[]> {
   if (DEMO) return demoEfetivo(await seed(), propriedadeId, de, ate);
   return ok(await supabase().rpc('efetivo_periodo', { p_propriedade: propriedadeId, p_de: de, p_ate: ate }));

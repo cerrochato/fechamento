@@ -4,18 +4,29 @@ import Link from 'next/link';
 import Moldura from '@/components/Moldura';
 import FiltroPeriodo, { inicioUltimos } from '@/components/FiltroPeriodo';
 import { useApp } from '@/lib/contexto';
-import { efetivoPeriodo, hoje, movimentacoes, potreiros } from '@/lib/dados';
+import { areaPecuaria, efetivoPeriodo, estoquesMensais, hoje, movimentacoes, pesosDoMes } from '@/lib/dados';
 import { dataBR, dec, int } from '@/lib/formato';
-import type { Categoria, LinhaEfetivo, Movimentacao } from '@/lib/tipos';
+import type { Categoria, LinhaEfetivo, LinhaEstoque, Movimentacao } from '@/lib/tipos';
 
-// Matrizes = fêmeas de cria (Vaca de cria, Vaquilhona cria, Ovelha de cria…)
-const MATRIZ = /^(vaca|vaquilhona|ovelha|égua|egua)( de)? cria$/i;
-const ENTRA_KG = ['AQUISICAO', 'VENDA_INT_ENTRADA'];
-const SAI_KG = ['VENDA', 'VENDA_INT_SAIDA', 'CONSUMO'];
+// Mesmas fórmulas da aba "Indicadores nova" da planilha
+const JOVEM = /\b[12]A\b|15 m|6-12/i;        // Vaquilhona/Touro/Novilho 1A e 2A, Vaquilhona cria 15 m, Terneiros 6-12 M
+const CRIA = /\(M\/F\)/i;                    // Terneiro (M/F), Cordeiro (M/F)
+const OUTROS = /^outros$/i;
+const ESTACOES: Record<string, string> = { '07': 'inverno', '09': 'primavera', '12': 'verão', '03': 'outono' };
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
-interface Base { efetivo: LinhaEfetivo[]; movs: Movimentacao[]; area: number }
+interface Base {
+  efetivo: LinhaEfetivo[]; movs: Movimentacao[];
+  meses: { mes: string; fim: string; linhas: LinhaEstoque[]; area: number; areaUtil: number; kgCarga: number }[];
+}
 
-const pct = (a: number, b: number) => (b ? dec(a / b * 100, 1) + '%' : '–');
+async function carregar(prop: number, de: string, ate: string) {
+  const [efetivo, movs, est, area, pesos] = await Promise.all([
+    efetivoPeriodo(prop, de, ate), movimentacoes(prop, de, ate), estoquesMensais(prop, de, ate), areaPecuaria(prop, de, ate), pesosDoMes(prop, de, ate)]);
+  return { efetivo, movs, meses: est.map((m, i) => ({ ...m, area: area[i].total, areaUtil: area[i].util,
+    // kg para a carga: cabeças teóricas × peso da contagem do mês (ou peso de referência)
+    kgCarga: m.linhas.reduce((s, l) => s + Number(l.cabecas) * (pesos.get(m.mes)?.get(l.categoria_id) ?? Number(l.peso_padrao_kg ?? 0)), 0) })) };
+}
 
 export default function Indicadores() {
   const { propriedade, propriedades, cad } = useApp();
@@ -26,11 +37,13 @@ export default function Indicadores() {
 
   useEffect(() => {
     setBase(null);
-    const ps = todas ? propriedades : [propriedade];
-    Promise.all(ps.map(async p => {
-      const [ef, mv, pots] = await Promise.all([efetivoPeriodo(p.id, de, ate), movimentacoes(p.id, de, ate), potreiros(p.id)]);
-      return { ef, mv, area: pots.reduce((s, x) => s + Number(x.area_util_ha ?? 0), 0) };
-    })).then(rs => setBase({ efetivo: rs.flatMap(r => r.ef), movs: rs.flatMap(r => r.mv), area: rs.reduce((s, r) => s + r.area, 0) }));
+    Promise.all((todas ? propriedades : [propriedade]).map(p => carregar(p.id, de, ate))).then(rs => setBase({
+      efetivo: rs.flatMap(r => r.efetivo), movs: rs.flatMap(r => r.movs),
+      // soma as propriedades mês a mês
+      meses: rs[0].meses.map((m, i) => ({ ...m, linhas: rs.flatMap(r => r.meses[i].linhas),
+        area: rs.reduce((s, r) => s + r.meses[i].area, 0), areaUtil: rs.reduce((s, r) => s + r.meses[i].areaUtil, 0),
+        kgCarga: rs.reduce((s, r) => s + r.meses[i].kgCarga, 0) })),
+    }));
   }, [propriedade, propriedades, todas, de, ate]);
 
   const dias = (new Date(ate + 'T12:00:00').getTime() - new Date(de + 'T12:00:00').getTime()) / 86400000 + 1;
@@ -44,83 +57,85 @@ export default function Indicadores() {
         {todas ? 'Todas as propriedades' : propriedade.nome} · {dataBR(de)} a {dataBR(ate)} ({int(dias)} dias)
       </p>
       {!base && <p className="suave">Calculando…</p>}
-      {base && <Conteudo base={base} cats={cad.categorias} especies={cad.especies} dias={dias} />}
+      {base && base.meses.length > 0 && <Conteudo base={base} cats={cad.categorias} especies={cad.especies} dias={dias} />}
     </Moldura>
   );
 }
 
 function Conteudo({ base, cats, especies, dias }: { base: Base; cats: Categoria[]; especies: { id: number; nome: string }[]; dias: number }) {
-  const catPorNome = (esp: string, nome: string) => cats.find(c => c.nome === nome && especies.find(e => e.id === c.especie_id)?.nome === esp);
-  const peso = (c?: Categoria) => Number(c?.peso_padrao_kg ?? 0);
-  // kg de uma movimentação: peso informado, senão o peso de referência da categoria
-  const kgMov = (m: Movimentacao) => m.quantidade * (Number(m.peso_medio_kg ?? 0) || peso(cats.find(c => c.id === m.categoria_id)));
+  const bov = especies.find(e => /^bovino/i.test(e.nome)), ov = especies.find(e => /^ovino/i.test(e.nome));
+  const catDe = (id: number) => cats.find(c => c.id === id);
+  const catNome = (esp: string, nome: string) => cats.find(c => c.nome === nome && especies.find(e => e.id === c.especie_id)?.nome === esp);
+  const peso = (c?: Categoria | null) => Number(c?.peso_padrao_kg ?? 0);
+  const media = (v: number[]) => (v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0);
 
-  const linhas = especies.map(e => {
-    const ef = base.efetivo.filter(l => l.especie === e.nome);
-    const s = (k: keyof LinhaEfetivo, f?: (l: LinhaEfetivo) => boolean) => ef.filter(l => !f || f(l)).reduce((a, l) => a + Number(l[k]), 0);
-    const ini = s('estoque_inicial'), fim = s('estoque_final'), medio = (ini + fim) / 2;
-    const kgIni = ef.reduce((a, l) => a + Number(l.estoque_inicial) * peso(catPorNome(e.nome, l.categoria)), 0);
-    const kgFim = ef.reduce((a, l) => a + Number(l.estoque_final) * peso(catPorNome(e.nome, l.categoria)), 0);
-    const matrizes = s('estoque_inicial', l => MATRIZ.test(l.categoria));
-    const nasc = s('nascimento'), mortes = s('morte');
-    // mortes de crias: na(s) categoria(s) onde entram os nascimentos
-    const mortesCria = s('morte', l => Number(l.nascimento) > 0);
-    const desfrute = s('venda') + s('venda_int_saida') + s('consumo') - s('aquisicao') - s('venda_int_entrada');
-    const ms = base.movs.filter(m => cats.find(c => c.id === m.categoria_id)?.especie_id === e.id);
-    const kgEnt = ms.filter(m => ENTRA_KG.includes(m.ocorrencia)).reduce((a, m) => a + kgMov(m), 0);
-    const kgSai = ms.filter(m => SAI_KG.includes(m.ocorrencia)).reduce((a, m) => a + kgMov(m), 0);
-    const kgProd = kgFim - kgIni + kgSai - kgEnt;
-    return { e, ini, fim, medio, kgIni, kgFim, matrizes, nasc, mortes, mortesCria, desfrute, kgEnt, kgSai, kgProd, mostrar: ini + fim + nasc + mortes > 0 };
-  }).filter(l => l.mostrar);
+  // rebanho médio = média dos estoques no fim de cada mês
+  const rebMedio = (f: (l: LinhaEstoque) => boolean) => media(base.meses.map(m => m.linhas.filter(f).reduce((s, l) => s + Number(l.cabecas), 0)));
+  const ef = (esp?: { nome: string }) => base.efetivo.filter(l => l.especie === esp?.nome);
+  const soma = (ls: LinhaEfetivo[], k: keyof LinhaEfetivo, f?: (l: LinhaEfetivo) => boolean) => ls.filter(l => !f || f(l)).reduce((a, l) => a + Number(l[k]), 0);
+  const movsDe = (espId: number | undefined, ocs: string[]) => base.movs.filter(m => ocs.includes(m.ocorrencia) && catDe(m.categoria_id)?.especie_id === espId);
+  const kgInf = (ms: Movimentacao[]) => ms.reduce((s, m) => s + m.quantidade * Number(m.peso_medio_kg ?? 0), 0);   // só o peso informado, como a planilha
+  const valor = (ms: Movimentacao[]) => ms.reduce((s, m) => s + Number(m.valor_total ?? 0), 0);
 
-  const totProd = linhas.reduce((a, l) => a + l.kgProd, 0);
-  const ano = 365 / dias;   // para anualizar o kg/ha quando o período não é de 12 meses
+  const areaMedia = media(base.meses.map(m => m.area));
+  const eb = ef(bov), eo = ef(ov);
+  const rmBov = rebMedio(l => l.especie_id === bov?.id), rmOv = rebMedio(l => l.especie_id === ov?.id);
+  const rmJov = rebMedio(l => l.especie_id === bov?.id && JOVEM.test(l.categoria));
+  const rmAdu = rebMedio(l => l.especie_id === bov?.id && !JOVEM.test(l.categoria) && !CRIA.test(l.categoria) && !OUTROS.test(l.categoria));
+  const nascBov = soma(eb, 'nascimento'), mortCria = soma(eb, 'morte', l => CRIA.test(l.categoria));
+  const mortJov = soma(eb, 'morte', l => JOVEM.test(l.categoria)), mortAdu = soma(eb, 'morte', l => !JOVEM.test(l.categoria) && !CRIA.test(l.categoria));
+  const iniBov = soma(eb, 'estoque_inicial');
+  const kgIni = eb.reduce((s, l) => s + Number(l.estoque_inicial) * peso(catNome(l.especie, l.categoria)), 0);
+  const kgFim = eb.reduce((s, l) => s + Number(l.estoque_final) * peso(catNome(l.especie, l.categoria)), 0);
+  const vendasBov = movsDe(bov?.id, ['VENDA']);
+  const kgSaiu = kgInf(movsDe(bov?.id, ['VENDA', 'VENDA_INT_SAIDA'])), kgEntrou = kgInf(movsDe(bov?.id, ['AQUISICAO', 'VENDA_INT_ENTRADA']));
+  const pac = kgFim - kgIni + kgSaiu - kgEntrou;
+  const precoKg = kgInf(vendasBov) ? valor(vendasBov) / kgInf(vendasBov) : 0;
+  const eqOv = precoKg ? valor(movsDe(ov?.id, ['VENDA'])) / precoKg : 0;
+  const pct = (a: number, b: number) => (b ? dec(a / b * 100, 1) + '%' : '–');
+
+  const cargas = base.meses.filter(m => ESTACOES[m.mes.slice(5, 7)]).map(m => {
+    const kg = m.kgCarga;
+    return { t: `Carga ${ESTACOES[m.mes.slice(5, 7)]} (${MESES[Number(m.mes.slice(5, 7)) - 1]}/${m.mes.slice(2, 4)})`, kgha: m.areaUtil ? kg / m.areaUtil : 0 };
+  });
+
+  const L: [string, string, string?][] = [
+    ['Área utilizada para pecuária (média, ha)', dec(areaMedia, 1)],
+    ['Rebanho médio bovino', dec(rmBov, 1)],
+    ['Rebanho médio ovino', dec(rmOv, 1)],
+    ['Taxa de mortalidade de terneiros', pct(mortCria, nascBov), '2,5%'],
+    ['Taxa de mortalidade de bovinos jovens', pct(mortJov, rmJov), '1%'],
+    ['Taxa de mortalidade de bovinos adultos', pct(mortAdu, rmAdu), '0,8%'],
+    ['Taxa de mortalidade geral de bovinos', pct(soma(eb, 'morte'), rmBov), '2%'],
+    ['Taxa de mortalidade geral de ovinos', pct(soma(eo, 'morte'), rmOv), '5%'],
+    ['Taxa de desfrute de bovinos', pct(soma(eb, 'venda') + soma(eb, 'consumo'), iniBov), '> 30%'],
+    ['Eficiência de estoque de bovinos', pct(pac, kgIni), '> 35%'],
+    ['Produção anual de carne (PAC) bovinos, kg', int(pac)],
+    ['Produtividade bovinos (kg PV/ha)', areaMedia ? dec(pac / areaMedia, 1) : '–', '> 150'],
+    ['Eq. ovinos (kg equivalente bovino)', int(eqOv)],
+    ['PAC geral (ov + bov), kg', int(pac + eqOv)],
+    ['Produtividade geral (kg PV/ha)', areaMedia ? dec((pac + eqOv) / areaMedia, 1) : '–', '> 150'],
+    ['GMD global rebanho bovino (kg/dia)', rmBov ? dec(pac / rmBov / dias, 3) : '–', '0,291'],
+    ...cargas.map(c => [`${c.t}, kg PV/ha · UA/ha`, `${dec(c.kgha, 1)} · ${dec(c.kgha / 450)}`] as [string, string]),
+    ['Natalidade bovinos (nasc. ÷ vacas e vaquilhonas de cria no início)', pct(nascBov, soma(eb, 'estoque_inicial', l => /^(vaca|vaquilhona)( de)? cria$/i.test(l.categoria)))],
+  ];
 
   return (
     <>
-      <section className="cartao" style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-        <div><small className="suave">kg produzidos (todas as espécies)</small><br /><strong style={{ fontSize: '1.3rem' }}>{int(totProd)} kg</strong></div>
-        <div><small className="suave">kg/ha no período</small><br /><strong style={{ fontSize: '1.3rem' }}>{base.area ? dec(totProd / base.area, 1) : '–'}</strong></div>
-        {Math.abs(dias - 365) > 3 && <div><small className="suave">kg/ha/ano</small><br /><strong>{base.area ? dec(totProd / base.area * ano, 1) : '–'}</strong></div>}
-        <div><small className="suave">Área útil</small><br /><strong>{dec(base.area, 1)} ha</strong></div>
-      </section>
-
-      <div className="rolagem" style={{ marginTop: 12 }}>
+      <div className="rolagem">
         <table>
-          <thead><tr><th>Indicador</th>{linhas.map(l => <th key={l.e.id}>{l.e.nome}</th>)}</tr></thead>
-          <tbody>
-            <Linha t="Rebanho inicial (cab.)" v={linhas.map(l => int(l.ini))} />
-            <Linha t="Rebanho final (cab.)" v={linhas.map(l => int(l.fim))} />
-            <Linha t="Rebanho médio (cab.)" v={linhas.map(l => int(l.medio))} />
-            <Linha t="Matrizes no início" v={linhas.map(l => l.matrizes ? int(l.matrizes) : '–')} />
-            <Linha t="Nascimentos" v={linhas.map(l => int(l.nasc))} />
-            <Linha t="Natalidade (nasc. ÷ matrizes)" v={linhas.map(l => pct(l.nasc, l.matrizes))} forte />
-            <Linha t="Mortes" v={linhas.map(l => int(l.mortes))} />
-            <Linha t="Mortalidade (mortes ÷ rebanho médio)" v={linhas.map(l => pct(l.mortes, l.medio))} forte />
-            <Linha t="Mortalidade de crias (÷ nascimentos)" v={linhas.map(l => pct(l.mortesCria, l.nasc))} forte />
-            <Linha t="Desfrute líquido (cab.)" v={linhas.map(l => int(l.desfrute))} />
-            <Linha t="Taxa de desfrute (÷ rebanho médio)" v={linhas.map(l => pct(l.desfrute, l.medio))} forte />
-            <Linha t="kg no início" v={linhas.map(l => int(l.kgIni))} />
-            <Linha t="kg no final" v={linhas.map(l => int(l.kgFim))} />
-            <Linha t="kg saídos (venda, consumo)" v={linhas.map(l => int(l.kgSai))} />
-            <Linha t="kg comprados" v={linhas.map(l => int(l.kgEnt))} />
-            <Linha t="kg produzidos" v={linhas.map(l => int(l.kgProd))} forte />
-            <Linha t="kg produzidos por ha" v={linhas.map(l => base.area ? dec(l.kgProd / base.area, 1) : '–')} forte />
-            <Linha t="kg produzidos por cab. média" v={linhas.map(l => l.medio ? dec(l.kgProd / l.medio, 1) : '–')} />
-          </tbody>
+          <thead><tr><th>Indicador</th><th>Resultado</th><th>Referência</th></tr></thead>
+          <tbody>{L.map(([t, v, r]) => <tr key={t}><td>{t}</td><td><strong>{v}</strong></td><td className="suave">{r ?? ''}</td></tr>)}</tbody>
         </table>
       </div>
       <div className="suave" style={{ fontSize: '.82rem', marginTop: 10, lineHeight: 1.5 }}>
-        <p style={{ margin: '4px 0' }}><strong>Como é calculado.</strong> Matrizes são o estoque inicial de Vaca de cria, Vaquilhona cria e Ovelha de cria.
-          Mortalidade de crias conta as mortes nas categorias que recebem os nascimentos (terneiros, cordeiros).
-          Desfrute líquido = vendas + vendas internas + consumo − compras − vendas internas recebidas.</p>
-        <p style={{ margin: '4px 0' }}>kg produzidos = kg final − kg inicial + kg vendidos e consumidos − kg comprados. Estoque usa o peso de referência de cada categoria;
-          compras e vendas usam o peso informado no lançamento. Mortes não somam produção. Por ha usa a área útil de todos os potreiros ativos.</p>
+        <p style={{ margin: '4px 0' }}><strong>Como é calculado (igual à planilha).</strong> Rebanho médio = média dos estoques no fim de cada mês.
+          Área = média mensal da área total dos potreiros em uso de pecuária (Controle de áreas); a carga usa a área útil de pecuária do mês.
+          Desfrute = (vendas + consumo) ÷ estoque inicial.</p>
+        <p style={{ margin: '4px 0' }}>PAC = (kg final − kg inicial, pelo peso de referência) + kg vendidos e de vendas internas − kg comprados e de vendas internas recebidas (peso informado nos lançamentos).
+          Eq. ovinos = R$ das vendas de ovinos ÷ R$/kg médio das vendas de bovinos ({precoKg ? dec(precoKg) : '–'}). GMD = PAC ÷ rebanho médio ÷ dias do período.
+          Carga = estoque teórico no fim do mês × peso médio da contagem do mês (ou peso de referência) ÷ área útil de pecuária.</p>
       </div>
     </>
   );
-}
-
-function Linha({ t, v, forte }: { t: string; v: string[]; forte?: boolean }) {
-  return <tr className={forte ? 'total' : undefined}><td>{t}</td>{v.map((x, i) => <td key={i}>{x}</td>)}</tr>;
 }

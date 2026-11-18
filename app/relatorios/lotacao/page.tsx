@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Moldura from '@/components/Moldura';
 import FiltroPeriodo, { inicioUltimos } from '@/components/FiltroPeriodo';
 import { useApp } from '@/lib/contexto';
-import { cargaContagem, hoje, listarContagens, potreiros } from '@/lib/dados';
+import { areaPecuaria, cargaContagem, estoquesMensais, hoje, listarContagens, pesosDoMes, potreiros } from '@/lib/dados';
 import { dataBR, dec, int } from '@/lib/formato';
 import type { Contagem, LinhaCarga, Potreiro, Propriedade } from '@/lib/tipos';
 
@@ -14,10 +14,18 @@ const nomeMes = (m: string) => `${MESES[Number(m.slice(5, 7)) - 1]}/${m.slice(2,
 
 // Uma contagem (a última de cada mês, já enviada ou fechada) com a carga por potreiro
 interface Foto { mes: string; contagem: Contagem; carga: LinhaCarga[] }
-interface Dados { prop: Propriedade; pots: Potreiro[]; area: number; fotos: Foto[] }
+// Carga do mês pela planilha: estoque teórico no fim do mês × peso da contagem do mês ÷ área útil de pecuária
+interface Mes { mes: string; cab: number; kg: number; area: number }
+interface Dados { prop: Propriedade; pots: Potreiro[]; area: number; fotos: Foto[]; meses: Mes[] }
 
 async function carregar(prop: Propriedade, de: string, ate: string): Promise<Dados> {
-  const [cs, pots] = await Promise.all([listarContagens(prop.id), potreiros(prop.id)]);
+  const [cs, pots, est, areas, pesos] = await Promise.all([listarContagens(prop.id), potreiros(prop.id),
+    estoquesMensais(prop.id, de, ate), areaPecuaria(prop.id, de, ate), pesosDoMes(prop.id, de, ate)]);
+  const meses: Mes[] = est.map((m, i) => ({
+    mes: m.mes.slice(0, 7), area: areas[i].util,
+    cab: m.linhas.reduce((s, l) => s + Number(l.cabecas), 0),
+    kg: m.linhas.reduce((s, l) => s + Number(l.cabecas) * (pesos.get(m.mes)?.get(l.categoria_id) ?? Number(l.peso_padrao_kg ?? 0)), 0),
+  }));
   const porMes = new Map<string, Contagem>();
   for (const c of cs) {
     if (c.status === 'rascunho' || c.data < de || c.data > ate) continue;
@@ -26,11 +34,9 @@ async function carregar(prop: Propriedade, de: string, ate: string): Promise<Dad
   }
   const fotos = await Promise.all([...porMes.entries()].sort((a, b) => a[0].localeCompare(b[0]))
     .map(async ([mes, contagem]) => ({ mes, contagem, carga: await cargaContagem(contagem.id) })));
-  return { prop, pots, area: pots.reduce((s, p) => s + Number(p.area_util_ha ?? 0), 0), fotos };
+  return { prop, pots, area: pots.reduce((s, p) => s + Number(p.area_util_ha ?? 0), 0), fotos, meses };
 }
 
-const kgDe = (f: Foto) => f.carga.reduce((s, l) => s + Number(l.quilos), 0);
-const cabDe = (f: Foto) => f.carga.reduce((s, l) => s + Number(l.cabecas), 0);
 const media = (v: number[]) => (v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0);
 
 export default function Lotacao() {
@@ -53,12 +59,11 @@ export default function Lotacao() {
       <h1 style={{ marginTop: 8 }}>Lotação</h1>
       <FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} todas={todas} setTodas={setTodas} />
       <p className="suave" style={{ fontSize: '.88rem' }}>
-        {todas ? 'Todas as propriedades' : propriedade.nome} · {dataBR(de)} a {dataBR(ate)} · usa a última contagem enviada ou fechada de cada mês · 1 UA = {UA} kg
+        {todas ? 'Todas as propriedades' : propriedade.nome} · {dataBR(de)} a {dataBR(ate)} · estoque teórico no fim de cada mês × peso médio da contagem do mês ÷ área útil de pecuária (Controle de áreas) · 1 UA = {UA} kg
       </p>
       {!dados && <p className="suave">Calculando…</p>}
-      {dados && dados.every(d => !d.fotos.length) && <p className="suave">Nenhuma contagem enviada ou fechada no período.</p>}
-      {dados && dados.length > 1 && dados.some(d => d.fotos.length) && <Geral dados={dados} />}
-      {dados && dados.map(d => d.fotos.length > 0 && (
+            {dados && dados.length > 1 && <Geral dados={dados} />}
+      {dados && dados.map(d => (
         <Propriedade1 key={d.prop.id} d={d} mesAMes={mesAMes} setMesAMes={setMesAMes} />
       ))}
       </div>
@@ -68,20 +73,13 @@ export default function Lotacao() {
 
 // Soma das propriedades, mês a mês (área total x kg total)
 function Geral({ dados }: { dados: Dados[] }) {
-  const meses = [...new Set(dados.flatMap(d => d.fotos.map(f => f.mes)))].sort();
-  const linhas = meses.map(m => {
-    let kg = 0, cab = 0, area = 0;
-    for (const d of dados) {
-      const f = d.fotos.find(x => x.mes === m);
-      if (f) { kg += kgDe(f); cab += cabDe(f); area += d.area; }
-    }
-    return { m, kg, cab, area };
-  });
+  const linhas = dados[0].meses.map((x, i) => ({ m: x.mes,
+    kg: dados.reduce((s, d) => s + d.meses[i].kg, 0), cab: dados.reduce((s, d) => s + d.meses[i].cab, 0), area: dados.reduce((s, d) => s + d.meses[i].area, 0) }));
   const uas = linhas.map(l => (l.area ? l.kg / UA / l.area : 0));
   return (
     <section>
       <h2>Todas as propriedades</h2>
-      <Resumo media={media(uas)} max={Math.max(...uas)} min={Math.min(...uas)} area={Math.max(...linhas.map(l => l.area))} />
+      <Resumo media={media(uas)} max={Math.max(...uas)} min={Math.min(...uas)} area={media(linhas.map(l => l.area))} />
       <div className="rolagem">
         <table>
           <thead><tr><th>Mês</th><th>Cabeças</th><th>kg vivo</th><th>Área útil ha</th><th>kg/ha</th><th>UA/ha</th></tr></thead>
@@ -109,7 +107,7 @@ function Resumo({ media, max, min, area }: { media: number; max: number; min: nu
 }
 
 function Propriedade1({ d, mesAMes, setMesAMes }: { d: Dados; mesAMes: boolean; setMesAMes: (v: boolean) => void }) {
-  const uas = d.fotos.map(f => (d.area ? kgDe(f) / UA / d.area : 0));
+  const uas = d.meses.map(m => (m.area ? m.kg / UA / m.area : 0));
   // por potreiro: UA/ha em cada mês (0 quando estava vazio)
   const ids = new Set<number | null>(d.pots.map(p => p.id));
   for (const f of d.fotos) for (const l of f.carga) ids.add(l.potreiro_id);
@@ -128,22 +126,25 @@ function Propriedade1({ d, mesAMes, setMesAMes }: { d: Dados; mesAMes: boolean; 
   return (
     <section>
       <h2>{d.prop.nome}</h2>
-      <Resumo media={media(uas)} max={Math.max(...uas)} min={Math.min(...uas)} area={d.area} />
+      <Resumo media={media(uas)} max={Math.max(...uas)} min={Math.min(...uas)} area={media(d.meses.map(m => m.area))} />
       <div className="rolagem">
         <table>
-          <thead><tr><th>Mês</th><th>Contagem</th><th>Cabeças</th><th>kg vivo</th><th>kg/ha</th><th>UA/ha</th></tr></thead>
+          <thead><tr><th>Mês</th><th>Cabeças</th><th>kg vivo</th><th>Área útil pecuária</th><th>kg/ha</th><th>UA/ha</th><th>Contagem do mês</th></tr></thead>
           <tbody>
-            {d.fotos.map(f => (
-              <tr key={f.mes}><td>{nomeMes(f.mes)}</td>
-                <td><Link href={`/contagem/ver?id=${f.contagem.id}`}>{dataBR(f.contagem.data)}</Link></td>
-                <td>{int(cabDe(f))}</td><td>{int(kgDe(f))}</td>
-                <td>{d.area ? int(kgDe(f) / d.area) : '·'}</td><td>{d.area ? dec(kgDe(f) / UA / d.area) : '·'}</td></tr>
-            ))}
+            {d.meses.map(m => {
+              const f = d.fotos.find(x => x.mes === m.mes);
+              return (
+                <tr key={m.mes}><td>{nomeMes(m.mes)}</td><td>{int(m.cab)}</td><td>{int(m.kg)}</td><td>{dec(m.area, 1)}</td>
+                  <td>{m.area ? dec(m.kg / m.area, 1) : '·'}</td><td>{m.area ? dec(m.kg / UA / m.area) : '·'}</td>
+                  <td>{f ? <Link href={`/contagem/ver?id=${f.contagem.id}`}>{dataBR(f.contagem.data)}</Link> : <span className="suave">sem contagem (peso de referência)</span>}</td></tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      <h3 style={{ marginTop: 18 }}>Por potreiro</h3>
+      <h3 style={{ marginTop: 18 }}>Por potreiro (pela contagem de campo)</h3>
+      {d.fotos.length === 0 && <p className="suave">Sem contagem enviada ou fechada no período.</p>}
       <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '.9rem', margin: '6px 0 10px' }}>
         <input type="checkbox" checked={mesAMes} onChange={e => setMesAMes(e.target.checked)} style={{ width: 'auto' }} /> Mostrar UA/ha de cada mês
       </label>
