@@ -20,7 +20,9 @@ export default function Pagina() {
 }
 
 function VerContagem() {
-  const id = Number(useSearchParams().get('id'));
+  const params = useSearchParams();
+  const id = Number(params.get('id'));
+  const abaInicial = params.get('aba');
   const { propriedade, cad, sessao } = useApp();
   const gerente = propriedade.papel !== 'capataz';
   const [c, setC] = useState<Contagem | null>(null);
@@ -41,7 +43,7 @@ function VerContagem() {
   useEffect(() => { carregar(); buscarPotreiros(propriedade.id).then(setPots); }, [carregar, propriedade.id]);
 
   // gerente abre direto na conferência quando a contagem já foi enviada
-  useEffect(() => { if (c && gerente && c.status !== 'rascunho') setAba('planilha'); }, [c?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (c && gerente && (abaInicial === 'planilha' || c.status !== 'rascunho')) setAba('planilha'); }, [c?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (aba === 'planilha') fechamentoContagem(id).then(setFech);
@@ -99,7 +101,7 @@ function VerContagem() {
         <Preenchimento linhas={linhas} pots={pots} editavel={editavel} contagemId={id} aoMudar={carregar} />
       )}
 
-      {aba === 'planilha' && <Planilha contagemId={id} linhas={linhas} pots={pots} fech={fech} editavel={editavel && c.status !== 'fechada'} aoMudar={carregar} />}
+      {aba === 'planilha' && <Planilha contagemId={id} data={c.data} linhas={linhas} pots={pots} fech={fech} editavel={editavel && c.status !== 'fechada'} aoMudar={carregar} />}
       {aba === 'conferencia' && <Conferencia linhas={fech} />}
       {aba === 'potreiros' && <Cargas linhas={carga} />}
 

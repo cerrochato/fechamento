@@ -2,13 +2,14 @@
 // Grade para o gerente: categorias nas linhas, potreiros nas colunas, já com a contagem do capataz.
 // Cada célula é editável; ao lado da categoria aparecem o total contado, o saldo teórico e a diferença.
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useApp } from '@/lib/contexto';
 import { excluirLinhaContagem, salvarLinhaContagem } from '@/lib/dados';
 import { int } from '@/lib/formato';
 import type { LinhaContagem, LinhaFechamento, Potreiro } from '@/lib/tipos';
 
-export default function Planilha({ contagemId, linhas, pots, fech, editavel, aoMudar }: {
-  contagemId: number; linhas: LinhaContagem[]; pots: Potreiro[]; fech: LinhaFechamento[] | null;
+export default function Planilha({ contagemId, data, linhas, pots, fech, editavel, aoMudar }: {
+  contagemId: number; data: string; linhas: LinhaContagem[]; pots: Potreiro[]; fech: LinhaFechamento[] | null;
   editavel: boolean; aoMudar: () => Promise<void>;
 }) {
   const { cad, sessao } = useApp();
@@ -97,7 +98,14 @@ export default function Planilha({ contagemId, linhas, pots, fech, editavel, aoM
                     <td>{c.nome}</td>
                     <td style={{ fontWeight: 700, background: 'var(--verde-claro)' }}>{int(cont)}</td>
                     <td style={{ background: 'var(--verde-claro)' }}>{fech ? int(teo) : '…'}</td>
-                    <td className={d > 0 ? 'e' : d < 0 ? 's' : ''} style={{ fontWeight: 700, background: 'var(--verde-claro)' }}>{!fech ? '…' : d === 0 ? '✓' : (d > 0 ? '+' : '') + int(d)}</td>
+                    <td className={d > 0 ? 'e' : d < 0 ? 's' : ''} style={{ fontWeight: 700, background: 'var(--verde-claro)' }}>
+                      {!fech ? '…' : d === 0 ? '✓' : (d > 0 ? '+' : '') + int(d)}
+                      {fech && d !== 0 && editavel && (
+                        <Link title="Lançar a movimentação que explica esta diferença"
+                          href={`/lancar?categoria=${c.id}&qtd=${Math.abs(d)}&data=${data}&dif=${d}&voltar=${encodeURIComponent(`/contagem/ver?id=${contagemId}&aba=planilha`)}`}
+                          style={{ marginLeft: 8, fontSize: '.78rem', fontWeight: 600, color: 'var(--verde)', textDecoration: 'underline' }}>Lançar</Link>
+                      )}
+                    </td>
                     {colunas.map(p => {
                       const v = valor(p.id, c.id), k = `${p.id}|${c.id}`;
                       return (

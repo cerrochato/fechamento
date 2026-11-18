@@ -16,7 +16,11 @@ export default function Pagina() {
 
 function Lancar() {
   const { propriedade, cad, sessao, recarregarCadastros } = useApp();
-  const editarId = Number(useSearchParams().get('editar')) || null;
+  const sp = useSearchParams();
+  const editarId = Number(sp.get('editar')) || null;
+  // vindo da planilha da contagem: categoria, quantidade e data da diferença já preenchidas
+  const dif = Number(sp.get('dif')) || 0;
+  const voltar = sp.get('voltar');
   const router = useRouter();
   const [pots, setPots] = useState<Potreiro[]>([]);
   const [data, setData] = useState(hoje());
@@ -38,9 +42,22 @@ function Lancar() {
   useEffect(() => { buscarPotreiros(propriedade.id).then(setPots); }, [propriedade.id]);
 
   const opcoes = useMemo(() => [
-    ...cad.ocorrencias.filter(o => !o.codigo.startsWith('TCAT') || (editarId && o.codigo === oc)),
+    ...cad.ocorrencias.filter(o => !o.codigo.startsWith('TCAT') || (editarId && o.codigo === oc))
+      .filter(o => !dif || o.sinal === Math.sign(dif)),   // diferença da contagem: só as ocorrências que explicam sobra (+) ou falta (−)
     ...(editarId ? [] : [{ codigo: TROCA, nome: 'Troca de categoria', sinal: 0 as const, exige_valor: false, exige_causa: false, ordem: 99 }]),
-  ], [cad.ocorrencias, editarId, oc]);
+  ], [cad.ocorrencias, editarId, oc, dif]);
+
+  useEffect(() => {
+    if (!dif) return;
+    const cat = cad.categorias.find(c => String(c.id) === sp.get('categoria'));
+    if (cat) { setEspecie(cat.especie_id); setCategoria(String(cat.id)); }
+    setQtd(sp.get('qtd') ?? ''); if (sp.get('data')) setData(sp.get('data')!);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // troca de categoria vinda de uma sobra (+): a categoria da diferença é a que RECEBE os animais
+  useEffect(() => {
+    if (dif > 0 && oc === TROCA && categoria && !categoriaPara) { setCategoriaPara(categoria); setCategoria(''); }
+  }, [oc]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // editando: carrega o lançamento no formulário
   useEffect(() => {
@@ -113,6 +130,7 @@ function Lancar() {
         await salvarMovimentacao(base, sessao);
       }
       if (base.contraparte_nova) await recarregarCadastros();
+      if (voltar?.startsWith('/')) { router.push(voltar); return; }
       const nomeCat = catSel?.nome ?? '';
       setMsg({ ok: true, texto: `Salvo: ${tipo?.nome} de ${int(base.quantidade)} ${nomeCat}.` });
       limpar();
@@ -127,6 +145,14 @@ function Lancar() {
   return (
     <Moldura>
       <h1>{editarId ? 'Editar lançamento' : 'Novo lançamento'}</h1>
+      {dif !== 0 && (
+        <div className="aviso" style={{ marginBottom: 8 }}>
+          Diferença de <strong>{dif > 0 ? '+' : ''}{dif} {cad.categorias.find(c => String(c.id) === sp.get('categoria'))?.nome}</strong> na contagem.{' '}
+          {dif > 0 ? 'Sobraram animais: foi nascimento, compra, troca de categoria (vieram de outra) ou entrada de outra propriedade?'
+                   : 'Faltaram animais: foi morte, consumo, venda, troca de categoria (foram para outra) ou saída para outra propriedade?'}
+          {voltar && <> <a href={voltar} style={{ textDecoration: 'underline' }}>Voltar sem lançar</a></>}
+        </div>
+      )}
       {msg && <div className={`aviso ${msg.ok ? 'ok' : 'erro'}`} role="status">{msg.texto}</div>}
 
       <label>O que aconteceu?</label>
