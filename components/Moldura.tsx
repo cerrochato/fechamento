@@ -24,7 +24,7 @@ export default function Moldura({ children, largo, permiteTodas }: { children: R
   return (
     <>
       <header className="topo nao-imprime">
-        <Link href="/" className="marca" aria-label="Início"><img src="/logo.png" alt="Estância Cerro Chato" /></Link>
+        <Link href="/" className="marca" aria-label="Início"><img src="/logo-branco.png" alt="Estância Cerro Chato" /></Link>
         {propriedades.length > 1 ? (
           <select aria-label="Propriedade" value={mostraTodas ? 'todas' : propriedade.id}
             onChange={e => (e.target.value === 'todas' ? setTodas(true) : trocarPropriedade(Number(e.target.value)))}>

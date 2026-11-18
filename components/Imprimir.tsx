@@ -10,7 +10,7 @@ export default function Imprimir({ de, ate }: { de?: string; ate?: string }) {
   return (
     <>
       <div className="so-impressao cabecalho-pdf">
-        <img src="/logo.png" alt="Estância Cerro Chato" />
+        <img src="/logo-verde.png" alt="Estância Cerro Chato" />
         <div>
           <strong>{todas ? 'Todas as propriedades' : propriedade.nome}</strong>
           {de && ate && <span>Período: {dataBR(de)} a {dataBR(ate)}</span>}
