@@ -112,13 +112,13 @@ function Conteudo({ base, cats, especies, dias }: { base: Base; cats: Categoria[
     ['Taxa de mortalidade geral de bovinos', pct(mb, rmBov), '2%', `Mortes de bovinos ÷ rebanho médio bovino = ${int(mb)} ÷ ${n1(rmBov)}`],
     ['Taxa de mortalidade geral de ovinos', pct(mo, rmOv), '5%', `Mortes de ovinos ÷ rebanho médio ovino = ${int(mo)} ÷ ${n1(rmOv)}`],
     ['Taxa de desfrute de bovinos', pct(vc, iniBov), '> 30%', `(Vendas + consumo) ÷ estoque inicial de bovinos = (${int(soma(eb, 'venda'))} + ${int(soma(eb, 'consumo'))}) ÷ ${int(iniBov)}`],
-    ['Eficiência de estoque de bovinos', pct(pac, kgIni), '> 35%', `PAC bovinos ÷ kg do estoque inicial = ${int(pac)} ÷ ${int(kgIni)}`],
-    ['Produção anual de carne (PAC) bovinos, kg', int(pac), '', `(kg final − kg inicial) + kg vendidos e de vendas internas − kg comprados e de vendas internas recebidas = (${int(kgFim)} − ${int(kgIni)}) + ${int(kgSaiu)} − ${int(kgEntrou)}. Estoque pelo peso de referência; vendas e compras pelo peso informado`],
-    ['Produtividade bovinos (kg PV/ha)', areaMedia ? dec(pac / areaMedia, 1) : '–', '> 150', `PAC bovinos ÷ área de pecuária = ${int(pac)} ÷ ${n1(areaMedia)}`],
+    ['Eficiência de estoque de bovinos', pct(pac, kgIni), '> 35%', `kg produzidos bovinos ÷ kg do estoque inicial = ${int(pac)} ÷ ${int(kgIni)}`],
+    ['kg produzidos bovinos', int(pac), '', `(kg final − kg inicial) + kg vendidos e de vendas internas − kg comprados e de vendas internas recebidas = (${int(kgFim)} − ${int(kgIni)}) + ${int(kgSaiu)} − ${int(kgEntrou)}. Estoque pelo peso de referência; vendas e compras pelo peso informado`],
+    ['Produtividade bovinos (kg PV/ha)', areaMedia ? dec(pac / areaMedia, 1) : '–', '> 150', `kg produzidos bovinos ÷ área de pecuária = ${int(pac)} ÷ ${n1(areaMedia)}`],
     ['Eq. ovinos (kg equivalente bovino)', int(eqOv), '', `R$ das vendas de ovinos ÷ R$/kg médio das vendas de bovinos = ${dec(valor(movsDe(ov?.id, ['VENDA'])))} ÷ ${precoKg ? dec(precoKg) : '–'}`],
-    ['PAC geral (ov + bov), kg', int(pac + eqOv), '', `PAC bovinos + eq. ovinos = ${int(pac)} + ${int(eqOv)}`],
-    ['Produtividade geral (kg PV/ha)', areaMedia ? dec((pac + eqOv) / areaMedia, 1) : '–', '> 150', `PAC geral ÷ área de pecuária = ${int(pac + eqOv)} ÷ ${n1(areaMedia)}`],
-    ['GMD global rebanho bovino (kg/dia)', rmBov ? dec(pac / rmBov / dias, 3) : '–', '0,291', `PAC bovinos ÷ rebanho médio bovino ÷ dias = ${int(pac)} ÷ ${n1(rmBov)} ÷ ${int(dias)}`],
+    ['kg produzidos geral (ov + bov)', int(pac + eqOv), '', `kg produzidos bovinos + eq. ovinos = ${int(pac)} + ${int(eqOv)}`],
+    ['Produtividade geral (kg PV/ha)', areaMedia ? dec((pac + eqOv) / areaMedia, 1) : '–', '> 150', `kg produzidos geral ÷ área de pecuária = ${int(pac + eqOv)} ÷ ${n1(areaMedia)}`],
+    ['GMD global rebanho bovino (kg/dia)', rmBov ? dec(pac / rmBov / dias, 3) : '–', '0,291', `kg produzidos bovinos ÷ rebanho médio bovino ÷ dias = ${int(pac)} ÷ ${n1(rmBov)} ÷ ${int(dias)}`],
     ...cargas.map(c => [`${c.t}, kg PV/ha · UA/ha`, `${dec(c.kgha, 1)} · ${dec(c.kgha / 450)}`, '',
       `kg do estoque teórico em ${dataBR(c.fim)} (cabeças × peso médio da contagem do mês) ÷ área útil de pecuária = ${int(c.kg)} ÷ ${n1(c.area)}. UA/ha = kg/ha ÷ 450`] as [string, string, string, string]),
   ];
@@ -144,8 +144,8 @@ function Conteudo({ base, cats, especies, dias }: { base: Base; cats: Categoria[
         <p style={{ margin: '4px 0' }}><strong>Como é calculado (igual à planilha).</strong> Rebanho médio = média dos estoques no fim de cada mês.
           Área = média mensal da área total dos potreiros em uso de pecuária (Controle de áreas); a carga usa a área útil de pecuária do mês.
           Desfrute = (vendas + consumo) ÷ estoque inicial.</p>
-        <p style={{ margin: '4px 0' }}>PAC = (kg final − kg inicial, pelo peso de referência) + kg vendidos e de vendas internas − kg comprados e de vendas internas recebidas (peso informado nos lançamentos).
-          Eq. ovinos = R$ das vendas de ovinos ÷ R$/kg médio das vendas de bovinos ({precoKg ? dec(precoKg) : '–'}). GMD = PAC ÷ rebanho médio ÷ dias do período.
+        <p style={{ margin: '4px 0' }}>kg produzidos = (kg final − kg inicial, pelo peso de referência) + kg vendidos e de vendas internas − kg comprados e de vendas internas recebidas (peso informado nos lançamentos).
+          Eq. ovinos = R$ das vendas de ovinos ÷ R$/kg médio das vendas de bovinos ({precoKg ? dec(precoKg) : '–'}). GMD = kg produzidos ÷ rebanho médio ÷ dias do período.
           Carga = estoque teórico no fim do mês × peso médio da contagem do mês (ou peso de referência) ÷ área útil de pecuária.</p>
       </div>
     </>
