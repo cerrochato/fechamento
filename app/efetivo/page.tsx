@@ -4,8 +4,8 @@ import Moldura from '@/components/Moldura';
 import FiltroPeriodo, { inicioUltimos } from '@/components/FiltroPeriodo';
 import Link from 'next/link';
 import { useApp } from '@/lib/contexto';
-import { efetivoPeriodo, hoje } from '@/lib/dados';
-import { dataBR, int } from '@/lib/formato';
+import { efetivoPeriodo, hoje, valorKgRebanho } from '@/lib/dados';
+import { dataBR, int, reais } from '@/lib/formato';
 
 const sinal = (v: number) => (v > 0 ? '+' : '') + int(v);
 import type { LinhaEfetivo } from '@/lib/tipos';
@@ -30,9 +30,16 @@ export default function Efetivo() {
   const [de, setDe] = useState(inicioUltimos(12));
   const [ate, setAte] = useState(hoje());
   const [linhas, setLinhas] = useState<LinhaEfetivo[] | null>(null);
+  const [precos, setPrecos] = useState<Map<number, number>>(new Map());
 
   useEffect(() => {
     setLinhas(null);
+    // R$/kg por categoria (na soma das propriedades vale o primeiro valor encontrado)
+    Promise.all((todas ? propriedades : [propriedade]).map(p => valorKgRebanho(p.id, ate))).then(ms => {
+      const m = new Map<number, number>();
+      for (const x of ms) for (const [k, v] of x) if (!m.has(k)) m.set(k, v);
+      setPrecos(m);
+    });
     if (!todas) { efetivoPeriodo(propriedade.id, de, ate).then(setLinhas); return; }
     Promise.all(propriedades.map(p => efetivoPeriodo(p.id, de, ate))).then(listas => {
       const soma = new Map<string, LinhaEfetivo>();
@@ -44,7 +51,7 @@ export default function Efetivo() {
       }
       setLinhas([...soma.values()]);
     });
-  }, [propriedade.id, propriedades, todas, de, ate]);
+  }, [propriedade, propriedades, todas, de, ate]);
 
   return (
     <Moldura>
@@ -58,16 +65,15 @@ export default function Efetivo() {
       {!linhas && <p className="suave">Calculando…</p>}
       {linhas && (() => {
         // kg = cabeças × peso de referência da categoria (cadastro de categorias)
-        const peso = (l: LinhaEfetivo) => {
+        const catDe = (l: LinhaEfetivo) => {
           const e = cad.especies.find(x => x.nome === l.especie);
-          return Number(cad.categorias.find(c => c.nome === l.categoria && c.especie_id === e?.id)?.peso_padrao_kg ?? 0);
+          return cad.categorias.find(c => c.nome === l.categoria && c.especie_id === e?.id);
         };
+        const peso = (l: LinhaEfetivo) => Number(catDe(l)?.peso_padrao_kg ?? 0);
+        const preco = (l: LinhaEfetivo) => precos.get(catDe(l)?.id ?? -1) ?? 0;
         const kgIni = (l: LinhaEfetivo) => Number(l.estoque_inicial) * peso(l);
         const kgFim = (l: LinhaEfetivo) => Number(l.estoque_final) * peso(l);
         const vis = linhas.filter(l => COLS.some(c => Number(l[c.k]) !== 0));
-        const tot = (f: (l: LinhaEfetivo) => number) => vis.reduce((s, l) => s + f(l), 0);
-        const ci = tot(l => Number(l.estoque_inicial)), cf = tot(l => Number(l.estoque_final));
-        const ki = tot(kgIni), kf = tot(kgFim);
         return <>
           {cad.especies.map(e => {
         const ls = vis.filter(l => l.especie === e.nome);
@@ -104,15 +110,23 @@ export default function Efetivo() {
               <h2 style={{ marginTop: 0 }}>Resumo do período</h2>
               <div className="rolagem">
                 <table>
-                  <thead><tr><th></th><th>Início</th><th>Final</th><th>Variação</th></tr></thead>
+                  <thead><tr><th>Espécie</th><th>Cab. início</th><th>Cab. final</th><th>Dif. cab.</th><th>kg início</th><th>kg final</th><th>Dif. inventário kg</th><th>Dif. inventário R$</th><th>Patrimônio final R$</th></tr></thead>
                   <tbody>
-                    <tr><td>Cabeças</td><td>{int(ci)}</td><td>{int(cf)}</td><td>{sinal(cf - ci)}</td></tr>
-                    <tr className="total"><td>kg totais</td><td>{int(ki)}</td><td>{int(kf)}</td><td>{sinal(kf - ki)}</td></tr>
+                    {cad.especies.map(e => {
+                      const ls = vis.filter(l => l.especie === e.nome);
+                      if (!ls.length) return null;
+                      const t = (f: (l: LinhaEfetivo) => number) => ls.reduce((s, l) => s + f(l), 0);
+                      const a = t(l => Number(l.estoque_inicial)), b = t(l => Number(l.estoque_final)), x = t(kgIni), y = t(kgFim);
+                      const difR = t(l => (kgFim(l) - kgIni(l)) * preco(l)), patr = t(l => kgFim(l) * preco(l));
+                      return <tr key={e.id}><td>{e.nome}</td><td>{int(a)}</td><td>{int(b)}</td><td>{sinal(b - a)}</td>
+                        <td>{int(x)}</td><td>{int(y)}</td><td>{sinal(y - x)}</td>
+                        <td>{difR ? reais(difR) : '–'}</td><td>{patr ? reais(patr) : '–'}</td></tr>;
+                    })}
                   </tbody>
                 </table>
               </div>
               <p className="suave" style={{ fontSize: '.82rem', marginBottom: 0 }}>
-                Os kg usam o peso de referência de cada categoria (Cadastros › Categorias). Variação de kg mostra o estoque, não a produção, que entra nos indicadores.
+                Como na aba R-DIFERENÇA DE INVENTÁRIO: kg = cabeças × peso de referência da categoria; diferença de inventário em R$ = (kg final − kg inicial) × R$/kg de avaliação de cada categoria; patrimônio = kg final × R$/kg.
               </p>
             </section>
           )}

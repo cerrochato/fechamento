@@ -181,6 +181,24 @@ export async function pesosDoMes(propriedadeId: number, de: string, ate: string)
   return r;
 }
 
+// R$/kg de cada categoria para avaliar o rebanho (aba "R-DIFERENÇA DE INVENTÁRIO"),
+// da última safra que começou até a data
+export async function valorKgRebanho(propriedadeId: number, data: string): Promise<Map<number, number>> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let safras: any[], linhas: any[];
+  if (DEMO) {
+    const d = await seed();
+    safras = d.safra; linhas = (d.avaliacao_rebanho ?? []).filter((a: { propriedade_id: number }) => a.propriedade_id === propriedadeId);
+  } else {
+    const sb = supabase();
+    safras = ok(await sb.from('safra').select('id, inicio'));
+    linhas = ok(await sb.from('avaliacao_rebanho').select('safra_id, categoria_id, valor_kg').eq('propriedade_id', propriedadeId));
+  }
+  const comValor = safras.filter(s => s.inicio <= data && linhas.some(l => l.safra_id === s.id))
+    .sort((a, b) => b.inicio.localeCompare(a.inicio))[0];
+  return new Map(linhas.filter(l => l.safra_id === comValor?.id && l.valor_kg != null).map(l => [l.categoria_id, Number(l.valor_kg)]));
+}
+
 export async function efetivoPeriodo(propriedadeId: number, de: string, ate: string): Promise<LinhaEfetivo[]> {
   if (DEMO) return demoEfetivo(await seed(), propriedadeId, de, ate);
   return ok(await supabase().rpc('efetivo_periodo', { p_propriedade: propriedadeId, p_de: de, p_ate: ate }));
