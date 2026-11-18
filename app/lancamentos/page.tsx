@@ -27,7 +27,7 @@ export default function Lancamentos() {
 
   const carregar = () => {
     setLista(null);
-    if (gerente) transferenciasAConfirmar(propriedade.id).then(setPendentes); else setPendentes([]);
+    if (gerente) transferenciasAConfirmar(propriedade.id).then(setPendentes).catch(() => setPendentes([])); else setPendentes([]);
     const ps = todas ? propriedades : [propriedade];
     Promise.all(ps.map(p => movimentacoes(p.id, de, ate).then(ms => ms.map(m => ({ ...m, _prop: p.nome, _propId: p.id })))))
       .then(rs => setLista(rs.flat().sort((a, b) => b.data.localeCompare(a.data) || b.id - a.id)));
