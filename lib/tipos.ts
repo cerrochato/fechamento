@@ -65,7 +65,7 @@ export interface LinhaCarga {
 export type StatusAudio = 'enviado' | 'transcrito' | 'aplicado' | 'erro';
 export interface AudioContagem {
   id: number; propriedade_id: number; contagem_id: number | null; arquivo: string;
-  gravado_em: string; duracao_seg: number | null; status: StatusAudio; transcricao: string | null; erro: string | null;
+  gravado_em: string; criado_em?: string; duracao_seg: number | null; status: StatusAudio; transcricao: string | null; erro: string | null;
 }
 
 // Cadastros (telas de administração)

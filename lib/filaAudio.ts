@@ -60,7 +60,9 @@ export async function enviarFila(aoProgredir?: (msg: string) => void): Promise<n
       await removerPendente(a.id);   // já está seguro no servidor
       n++;
       aoProgredir?.(`Transcrevendo áudio ${n}…`);
-      await sb.functions.invoke('transcrever', { body: { audio_id: ins.data.id } }); // se falhar, fica com status "erro" e pode tentar de novo
+      // se a transcrição falhar (ou ainda não estiver ligada), marca o áudio com erro para não ficar esperando
+      const { transcreverDeNovo } = await import('./dados');
+      await transcreverDeNovo(ins.data.id).catch(() => { /* o erro já ficou gravado no áudio */ });
     }
     aoProgredir?.('');
   } finally {

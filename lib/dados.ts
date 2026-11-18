@@ -293,10 +293,24 @@ export async function urlAudio(arquivo: string): Promise<string | null> {
   return r.data?.signedUrl ?? null;
 }
 
+// Mensagem simples quando a função "transcrever" falha ou ainda não foi publicada
+export async function erroTranscricao(e: unknown): Promise<string> {
+  const err = e as { message?: string; context?: Response };
+  let msg = err?.message ?? String(e);
+  try { const j = await err.context?.json(); if (j?.erro) msg = j.erro; } catch { /* ignora */ }
+  if (/404|not found|Failed to send|relay/i.test(msg) || err?.context?.status === 404)
+    return 'A transcrição automática ainda não está ligada. Ouça o áudio e lance à mão, ou guarde para depois.';
+  return msg;
+}
+
 export async function transcreverDeNovo(id: number): Promise<void> {
   if (DEMO) return;
   const r = await supabase().functions.invoke('transcrever', { body: { audio_id: id } });
-  if (r.error) throw new Error(r.error.message);
+  if (r.error) {
+    const msg = await erroTranscricao(r.error);
+    await supabase().from('audio_contagem').update({ status: 'erro', erro: msg }).eq('id', id);
+    throw new Error(msg);
+  }
 }
 
 export async function marcarAudio(id: number, status: StatusAudio, contagemId?: number): Promise<void> {

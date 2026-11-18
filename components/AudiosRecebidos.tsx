@@ -56,23 +56,33 @@ function UmAudio({ audio, alvo, pots, aoTerminar }: {
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [tentando, setTentando] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
   useEffect(() => { urlAudio(audio.arquivo).then(setUrl); }, [audio.arquivo]);
   const quando = new Date(audio.gravado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  // enviado há mais de 2 minutos e ainda sem texto: a transcrição não respondeu
+  const parado = audio.status === 'enviado' && Date.now() - new Date(audio.criado_em ?? audio.gravado_em).getTime() > 120000;
+
+  async function tentar() {
+    setTentando(true); setAviso(null);
+    try { await transcreverDeNovo(audio.id); } catch (e) { setAviso((e as Error).message); } finally { setTentando(false); await aoTerminar(); }
+  }
+  async function descartar() {
+    if (!confirm('Descartar este áudio? Ele some da lista (o arquivo continua guardado).')) return;
+    await marcarAudio(audio.id, 'aplicado'); await aoTerminar();
+  }
 
   return (
     <div className="cartao" style={{ marginTop: 10, borderColor: 'var(--verde)' }}>
       <strong>🎙 Áudio de {quando}</strong>
-      {url && <audio controls src={url} style={{ width: '100%', marginTop: 8 }} />}
-      {audio.status === 'enviado' && <p className="suave">⏳ O app está ouvindo o áudio, espere alguns segundos…</p>}
-      {audio.status === 'erro' && (
+      {url && <audio controls preload="metadata" src={url} style={{ width: '100%', marginTop: 8 }} />}
+      {audio.status === 'enviado' && !parado && <p className="suave">⏳ O app está ouvindo o áudio, espere alguns segundos…</p>}
+      {(audio.status === 'erro' || parado) && (
         <>
-          <p className="erro">Não consegui transcrever: {audio.erro}</p>
-          <button className="botao sec" disabled={tentando}
-            onClick={async () => { setTentando(true); try { await transcreverDeNovo(audio.id); } finally { setTentando(false); await aoTerminar(); } }}>
-            Tentar de novo
-          </button>
+          <p className="erro">{audio.erro ?? aviso ?? 'A transcrição não respondeu.'}</p>
+          <button className="botao sec" disabled={tentando} onClick={tentar}>{tentando ? 'Tentando…' : 'Tentar de novo'}</button>
         </>
       )}
+      {aviso && audio.status !== 'erro' && <p className="erro">{aviso}</p>}
       {audio.status === 'transcrito' && audio.transcricao && (
         <>
           <p style={{ fontStyle: 'italic', margin: '8px 0' }}>“{audio.transcricao}”</p>
@@ -80,6 +90,7 @@ function UmAudio({ audio, alvo, pots, aoTerminar }: {
             aoAplicar={async cid => { await marcarAudio(audio.id, 'aplicado', cid); await aoTerminar(); }} />
         </>
       )}
+      <button className="excluir" style={{ marginTop: 8 }} onClick={descartar}>Descartar áudio</button>
     </div>
   );
 }
