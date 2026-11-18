@@ -209,5 +209,13 @@ tr.n3 td:first-child { padding-left:24px; } tr.n4 td:first-child { padding-left:
   th:first-child, td:first-child { position:static; }
   .cartao, section, .dash-graf, .hero, tr { break-inside:avoid; }
   .cartao { box-shadow:none; }
+  .dash-graficos { grid-template-columns:1fr 1fr !important; }
+  .dash-secao, .dash-graf { box-shadow:none; }
+  .vcols { height:170px; min-width:0 !important; gap:3px; }
+  .vcol { min-width:0; }
+  .vrot { font-size:6pt; }
+  .vval { font-size:6.5pt; }
+  .dash-rolagem { overflow:hidden !important; }
+  section.dash-secao { break-inside:auto; }
   a { text-decoration:none; color:inherit; }
 }

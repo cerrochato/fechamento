@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Moldura from '@/components/Moldura';
+import Imprimir from '@/components/Imprimir';
 import { useApp } from '@/lib/contexto';
 import { estoqueNaData, hoje, mesesAntes, movimentacoes } from '@/lib/dados';
 import { dataBR, int } from '@/lib/formato';
@@ -39,8 +40,9 @@ export default function Inicio() {
 
   return (
     <Moldura permiteTodas>
-      <h1>Olá, {sessao.nome.split(' ')[0]}</h1>
-      <div className="filtros" style={{ marginBottom: 12 }}>
+      <div className="titulo-rel"><h1>Olá, {sessao.nome.split(' ')[0]}</h1><Imprimir /></div>
+      <p className="so-impressao" style={{ margin: '0 0 8px' }}>Estoque em {dataBR(data)}</p>
+      <div className="filtros nao-imprime" style={{ marginBottom: 12 }}>
         <div>
           <label htmlFor="data">Estoque em</label>
           <input id="data" type="date" value={data} onChange={e => e.target.value && setData(e.target.value)} />
@@ -59,7 +61,7 @@ export default function Inicio() {
       </div>
 
       {porEspecie.filter(e => e.linhas.length).map(e => (
-        <details key={e.id} className="cartao" style={{ marginTop: 10 }}>
+        <details key={e.id} open className="cartao" style={{ marginTop: 10 }}>
           <summary><strong>{e.nome}</strong> <span className="suave">por categoria</span></summary>
           <table style={{ marginTop: 8 }}>
             <tbody>

@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import Moldura from '@/components/Moldura';
+import Imprimir from '@/components/Imprimir';
 import { useApp } from '@/lib/contexto';
 import { excluirMovimentacao, hoje, mesesAntes, movimentacoes, potreiros } from '@/lib/dados';
 import { dataBR, int, reais } from '@/lib/formato';
@@ -38,12 +39,12 @@ export default function Lancamentos() {
 
   return (
     <Moldura permiteTodas>
-      <h1>Lançamentos</h1>
-      <div className="filtros">
+      <div className="titulo-rel"><h1>Lançamentos</h1><Imprimir de={de} ate={ate} /></div>
+      <div className="filtros nao-imprime">
         <div><label htmlFor="de">De</label><input id="de" type="date" value={de} onChange={e => e.target.value && setDe(e.target.value)} /></div>
         <div><label htmlFor="ate">Até</label><input id="ate" type="date" value={ate} onChange={e => e.target.value && setAte(e.target.value)} /></div>
       </div>
-      <label htmlFor="f">Tipo</label>
+      <label htmlFor="f" className="nao-imprime">Tipo</label>
       <select id="f" value={filtro} onChange={e => setFiltro(e.target.value)}>
         <option value="">Todos</option>
         {cad.ocorrencias.map(o => <option key={o.codigo} value={o.codigo}>{o.nome}</option>)}
@@ -69,14 +70,14 @@ export default function Lancamentos() {
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div className={`q ${o?.sinal === 1 ? 'e' : 's'}`}>{o?.sinal === 1 ? '+' : '−'}{int(m.quantidade)}</div>
-                {m._propId !== propriedade.id ? <small className="suave">troque a propriedade no topo para editar</small>
+                <span className="nao-imprime">{m._propId !== propriedade.id ? <small className="suave">troque a propriedade no topo para editar</small>
                 : confirmar === m.id
                   ? <span><button className="excluir" onClick={() => excluir(m.id)}>Confirmar</button> · <button className="excluir" style={{ color: 'var(--suave)' }} onClick={() => setConfirmar(null)}>Não</button></span>
                   : <span>
                       <Link href={`/lancar?editar=${m.id}`} className="excluir" style={{ color: 'var(--verde)' }}>Editar</Link>
                       {' · '}
                       <button className="excluir" onClick={() => setConfirmar(m.id)}>Excluir</button>
-                    </span>}
+                    </span>}</span>
               </div>
             </div>
           );

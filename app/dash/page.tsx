@@ -2,6 +2,7 @@
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Moldura from '@/components/Moldura';
+import Imprimir from '@/components/Imprimir';
 import FiltroPeriodo, { inicioUltimos } from '@/components/FiltroPeriodo';
 import DashAreas from '@/components/DashAreas';
 import DashEspecie from '@/components/DashEspecie';
@@ -20,7 +21,7 @@ function Dash() {
   return (
     <Moldura permiteTodas largo>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <h1>Dash</h1>
+        <div className="titulo-rel"><h1>{aba === 'areas' ? 'Dash · Áreas' : `Dash · ${abas.find(a => a.id === aba)?.nome ?? ''}`}</h1><Imprimir de={de} ate={ate} /></div>
         <div className="chips" style={{ marginBottom: 12 }}>
           {abas.map(a => <button key={a.id} className={`chip ${a.id === aba ? 'sel' : ''}`} onClick={() => router.replace(`/dash?aba=${a.id}`)}>{a.nome}</button>)}
         </div>
