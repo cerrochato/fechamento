@@ -48,7 +48,7 @@ export default function ImportarSW() {
   const [chave, setChave] = useState(0);   // recria o campo de arquivo depois de importar
   const [feitas, setFeitas] = useState<(ImportacaoSW & { rec: number; desp: number })[] | null>(null);
   const [codigos, setCodigos] = useState<Set<string>>(new Set());
-  const pode = propriedade.papel !== 'capataz';
+  const pode = propriedade.papel === 'adm';
 
   async function recarregar() {
     const [imps, contas] = await Promise.all([importacoesSW(propriedade.id), contasFinanceiras()]);
@@ -72,7 +72,7 @@ export default function ImportarSW() {
     } catch (e) { setErro((e as Error).message); }
   }
 
-  if (!pode) return <Moldura><p>A importação do financeiro é só para gerente e administrador.</p></Moldura>;
+  if (!pode) return <Moldura><p>A importação do financeiro é só para o administrador.</p></Moldura>;
 
   const soma = (p: string) => lido ? lido.folhas.filter(l => l.codigo.startsWith(p)).reduce((s, l) => s + l.valor, 0) : 0;
   const rec = soma('1'), desp = soma('2');

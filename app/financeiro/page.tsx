@@ -14,7 +14,7 @@ export default function Financeiro() {
   return (
     <Moldura>
       <h1>Financeiro</h1>
-      {propriedade.papel === 'capataz' ? <p>O financeiro é visível só para gerente e administrador.</p> : (
+      {propriedade.papel !== 'adm' ? <p>O financeiro é visível só para o administrador.</p> : (
         <div className="lista">
           {TELAS.map(r => (
             <Link key={r.href} href={r.href} className="cartao item">

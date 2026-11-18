@@ -21,7 +21,7 @@ export default function FluxoCaixa() {
   const { todas } = useApp();
   const [dados, setDados] = useState<{ ls: LancFin[]; contas: ContaFin[] } | null>(null);
   const [abertas, setAbertas] = useState<Set<string>>(new Set());
-  const ps = (todas ? propriedades : [propriedade]).filter(p => p.papel !== 'capataz');
+  const ps = (todas ? propriedades : [propriedade]).filter(p => p.papel === 'adm');
 
   useEffect(() => {
     setDados(null);
@@ -39,7 +39,7 @@ export default function FluxoCaixa() {
         <div className="titulo-rel"><h1 style={{ marginTop: 8 }}>Fluxo de caixa</h1><Imprimir de={de} ate={ate} /></div>
         <div style={{ maxWidth: 728 }}><FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} /></div>
         <p className="suave" style={{ fontSize: '.88rem' }}>{todas ? 'Todas as propriedades' : propriedade.nome} · {dataBR(de)} a {dataBR(ate)} · valores em R$</p>
-        {!ps.length ? <p>O financeiro é visível só para gerente e administrador.</p>
+        {!ps.length ? <p>O financeiro é visível só para o administrador.</p>
           : !dados ? <p className="suave">Calculando…</p>
           : !dados.ls.length ? <p className="suave">Nenhum lançamento financeiro no período. <Link href="/financeiro/importar">Importar do SW Rural</Link></p>
           : <Tabela ls={dados.ls} contas={dados.contas} meses={meses} abertas={abertas}

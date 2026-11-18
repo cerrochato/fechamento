@@ -18,7 +18,7 @@ export default function ResumoFinanceiro() {
   const [ate, setAte] = useState(hoje());
   const { todas } = useApp();
   const [dados, setDados] = useState<{ r: Resumo; contas: ContaFin[]; difInv: number; n: number } | null>(null);
-  const ps = (todas ? propriedades : [propriedade]).filter(p => p.papel !== 'capataz');
+  const ps = (todas ? propriedades : [propriedade]).filter(p => p.papel === 'adm');
 
   useEffect(() => {
     setDados(null);
@@ -48,7 +48,7 @@ export default function ResumoFinanceiro() {
       <div className="titulo-rel"><h1 style={{ marginTop: 8 }}>Resumo financeiro</h1><Imprimir de={de} ate={ate} /></div>
       <FiltroPeriodo de={de} ate={ate} setDe={setDe} setAte={setAte} />
       <p className="suave" style={{ fontSize: '.88rem' }}>{todas ? 'Todas as propriedades' : propriedade.nome} · {dataBR(de)} a {dataBR(ate)}</p>
-      {!ps.length ? <p>O financeiro é visível só para gerente e administrador.</p>
+      {!ps.length ? <p>O financeiro é visível só para o administrador.</p>
         : !dados ? <p className="suave">Calculando…</p>
         : !dados.n ? <p className="suave">Nenhum lançamento financeiro no período. <Link href="/financeiro/importar">Importar do SW Rural</Link></p>
         : <Corpo {...dados} />}

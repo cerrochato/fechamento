@@ -19,8 +19,8 @@ export default function Moldura({ children, largo, permiteTodas }: { children: R
   const { propriedades, propriedade, trocarPropriedade, todas, setTodas } = useApp();
   const mostraTodas = permiteTodas && todas;
   const path = usePathname();
-  // aba Financeiro só para gerente e adm
-  const itens = ITENS.filter(i => !('fin' in i) || propriedade.papel !== 'capataz');
+  // aba Financeiro só para o administrador
+  const itens = ITENS.filter(i => !('fin' in i) || propriedade.papel === 'adm');
   return (
     <>
       <header className="topo nao-imprime">

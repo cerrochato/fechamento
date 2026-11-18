@@ -33,8 +33,8 @@ export default function Usuarios() {
       <Link href="/cadastros" className="suave">← Cadastros</Link>
       <h1 style={{ marginTop: 8 }}>Usuários e acessos</h1>
       <p className="suave" style={{ marginTop: -4, fontSize: '.9rem' }}>
-        <strong>Capataz:</strong> lança movimentações e contagens. <strong>Gerente:</strong> também fecha contagens, vê o financeiro e edita potreiros.
-        <strong> Administrador:</strong> tudo, em todas as propriedades.
+        <strong>Capataz:</strong> lança movimentações e contagens. <strong>Gerente:</strong> também fecha contagens e edita potreiros.
+        <strong> Administrador:</strong> tudo, em todas as propriedades, inclusive o financeiro.
       </p>
       {aviso && <div className="aviso" role="status">{aviso}</div>}
       {editando !== 'novo' && <button className="botao" onClick={() => { setAviso(''); setEditando('novo'); }}>＋ Novo usuário</button>}
