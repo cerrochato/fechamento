@@ -117,7 +117,13 @@ export async function efetivoPeriodo(propriedadeId: number, de: string, ate: str
 // Gravação
 // ---------------------------------------------------------------------------
 
-export async function salvarMovimentacao(m: NovaMovimentacao, s: Sessao): Promise<void> {
+export async function buscarMovimentacao(id: number): Promise<Movimentacao | null> {
+  if (DEMO) return (await seed()).movimentacao_rebanho.find((m: Movimentacao) => m.id === id) ?? null;
+  return ok(await supabase().from('movimentacao_rebanho').select('*').eq('id', id).maybeSingle());
+}
+
+// Sem id cria um lançamento novo; com id altera o existente
+export async function salvarMovimentacao(m: NovaMovimentacao, s: Sessao, id?: number): Promise<void> {
   const { contraparte_nova, ...linha } = m;
   if (DEMO) {
     const d = await seed();
@@ -126,7 +132,8 @@ export async function salvarMovimentacao(m: NovaMovimentacao, s: Sessao): Promis
       d.contraparte.push({ id, nome: contraparte_nova.toUpperCase() });
       linha.contraparte_id = id;
     }
-    d.movimentacao_rebanho.push({ ...linha, id: Date.now(), origem: 'app' });
+    if (id) Object.assign(d.movimentacao_rebanho.find((x: Movimentacao) => x.id === id), linha);
+    else d.movimentacao_rebanho.push({ ...linha, id: Date.now(), origem: 'app' });
     guardarDemo();
     return;
   }
@@ -135,7 +142,8 @@ export async function salvarMovimentacao(m: NovaMovimentacao, s: Sessao): Promis
     const c = ok(await sb.from('contraparte').insert({ nome: contraparte_nova.trim().toUpperCase() }).select('id').single()) as { id: number };
     linha.contraparte_id = c.id;
   }
-  ok(await sb.from('movimentacao_rebanho').insert({ ...linha, origem: 'app', criado_por: s.usuarioId }));
+  if (id) ok(await sb.from('movimentacao_rebanho').update(linha).eq('id', id));
+  else ok(await sb.from('movimentacao_rebanho').insert({ ...linha, origem: 'app', criado_por: s.usuarioId }));
 }
 
 export async function excluirMovimentacao(id: number): Promise<void> {

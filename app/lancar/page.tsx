@@ -1,16 +1,23 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Moldura from '@/components/Moldura';
 import { useApp } from '@/lib/contexto';
-import { hoje, potreiros as buscarPotreiros, salvarMovimentacao } from '@/lib/dados';
+import { buscarMovimentacao, hoje, potreiros as buscarPotreiros, salvarMovimentacao } from '@/lib/dados';
 import { dec, int, reais } from '@/lib/formato';
 import type { NovaMovimentacao, Potreiro } from '@/lib/tipos';
 
 // "Troca de categoria" vira um botão só: gera a saída da categoria antiga e a entrada na nova.
 const TROCA = 'TROCA';
 
-export default function Lancar() {
+export default function Pagina() {
+  return <Suspense fallback={null}><Lancar /></Suspense>;
+}
+
+function Lancar() {
   const { propriedade, cad, sessao, recarregarCadastros } = useApp();
+  const editarId = Number(useSearchParams().get('editar')) || null;
+  const router = useRouter();
   const [pots, setPots] = useState<Potreiro[]>([]);
   const [data, setData] = useState(hoje());
   const [oc, setOc] = useState<string>('');
@@ -33,9 +40,27 @@ export default function Lancar() {
   useEffect(() => { buscarPotreiros(propriedade.id).then(setPots); }, [propriedade.id]);
 
   const opcoes = useMemo(() => [
-    ...cad.ocorrencias.filter(o => !o.codigo.startsWith('TCAT')),
-    { codigo: TROCA, nome: 'Troca de categoria', sinal: 0 as const, exige_valor: false, exige_causa: false, ordem: 99 },
-  ], [cad.ocorrencias]);
+    ...cad.ocorrencias.filter(o => !o.codigo.startsWith('TCAT') || (editarId && o.codigo === oc)),
+    ...(editarId ? [] : [{ codigo: TROCA, nome: 'Troca de categoria', sinal: 0 as const, exige_valor: false, exige_causa: false, ordem: 99 }]),
+  ], [cad.ocorrencias, editarId, oc]);
+
+  // editando: carrega o lançamento no formulário
+  useEffect(() => {
+    if (!editarId) return;
+    buscarMovimentacao(editarId).then(m => {
+      if (!m) return setMsg({ ok: false, texto: 'Lançamento não encontrado.' });
+      const cat = cad.categorias.find(c => c.id === m.categoria_id);
+      const br = (v: number | null) => v == null ? '' : String(v).replace('.', ',');
+      setData(m.data); setOc(m.ocorrencia); if (cat) setEspecie(cat.especie_id); setCategoria(String(m.categoria_id));
+      setQtd(String(m.quantidade)); setCausa(m.causa_morte_id ? String(m.causa_morte_id) : '');
+      setPotreiro(m.potreiro_id ? String(m.potreiro_id) : '');
+      setContraparte(cad.contrapartes.find(c => c.id === m.contraparte_id)?.nome ?? '');
+      setPeso(br(m.peso_medio_kg)); setValorKg(br(m.valor_kg)); setObs(m.observacao ?? '');
+      // abre com o valor total gravado, para não mudar centavos por arredondamento
+      setPesoTotal(false); setPorTotal(m.valor_total != null);
+      setValorTotal(m.valor_total != null ? Number(m.valor_total).toFixed(2).replace('.', ',') : '');
+    });
+  }, [editarId]); // eslint-disable-line react-hooks/exhaustive-deps
   const tipo = opcoes.find(o => o.codigo === oc);
   const cats = cad.categorias.filter(c => c.especie_id === especie && c.nome !== 'Outros');
   const catSel = cad.categorias.find(c => String(c.id) === categoria);
@@ -83,6 +108,12 @@ export default function Lancar() {
         const existente = cad.contrapartes.find(c => c.nome.toUpperCase() === contraparte.trim().toUpperCase());
         if (existente) base.contraparte_id = existente.id; else base.contraparte_nova = contraparte.trim();
       }
+      if (editarId) {
+        await salvarMovimentacao(base, sessao, editarId);
+        if (base.contraparte_nova) await recarregarCadastros();
+        router.push('/lancamentos');
+        return;
+      }
       if (oc === TROCA) {
         await salvarMovimentacao({ ...base, ocorrencia: 'TCAT_SAIDA' }, sessao);
         await salvarMovimentacao({ ...base, ocorrencia: 'TCAT_ENTRADA', categoria_id: Number(categoriaPara) }, sessao);
@@ -103,7 +134,7 @@ export default function Lancar() {
 
   return (
     <Moldura>
-      <h1>Novo lançamento</h1>
+      <h1>{editarId ? 'Editar lançamento' : 'Novo lançamento'}</h1>
       {msg && <div className={`aviso ${msg.ok ? 'ok' : 'erro'}`} role="status">{msg.texto}</div>}
 
       <label>O que aconteceu?</label>
@@ -211,8 +242,9 @@ export default function Lancar() {
         <textarea id="obs" value={obs} onChange={e => setObs(e.target.value)} />
 
         <button className="botao" disabled={!pronto || salvando} onClick={salvar}>
-          {salvando ? 'Salvando…' : 'Salvar lançamento'}
+          {salvando ? 'Salvando…' : editarId ? 'Salvar alteração' : 'Salvar lançamento'}
         </button>
+        {editarId && <button className="botao sec" style={{ marginTop: 10 }} onClick={() => router.push('/lancamentos')}>Cancelar</button>}
       </>}
     </Moldura>
   );

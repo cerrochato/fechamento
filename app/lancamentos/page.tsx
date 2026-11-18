@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import Moldura from '@/components/Moldura';
 import { useApp } from '@/lib/contexto';
@@ -64,7 +65,11 @@ export default function Lancamentos() {
                 <div className={`q ${o?.sinal === 1 ? 'e' : 's'}`}>{o?.sinal === 1 ? '+' : '−'}{int(m.quantidade)}</div>
                 {confirmar === m.id
                   ? <span><button className="excluir" onClick={() => excluir(m.id)}>Confirmar</button> · <button className="excluir" style={{ color: 'var(--suave)' }} onClick={() => setConfirmar(null)}>Não</button></span>
-                  : <button className="excluir" onClick={() => setConfirmar(m.id)}>Excluir</button>}
+                  : <span>
+                      <Link href={`/lancar?editar=${m.id}`} className="excluir" style={{ color: 'var(--verde)' }}>Editar</Link>
+                      {' · '}
+                      <button className="excluir" onClick={() => setConfirmar(m.id)}>Excluir</button>
+                    </span>}
               </div>
             </div>
           );
