@@ -5,7 +5,7 @@ import { useApp } from '@/lib/contexto';
 import { sair, DEMO } from '@/lib/dados';
 
 const ITENS = [
-  { href: '/', icone: '⌂', nome: 'Início' },
+  { href: '/', icone: '⌂', nome: 'Início', tambem: ['/estoque'] },
   { href: '/lancar', icone: '＋', nome: 'Lançar' },
   { href: '/lancamentos', icone: '☰', nome: 'Histórico' },
   { href: '/contagem', icone: '✓', nome: 'Contagem' },
@@ -38,7 +38,7 @@ export default function Moldura({ children, largo, permiteTodas }: { children: R
       <main className="pagina" style={largo ? { maxWidth: 'none' } : undefined}>{children}</main>
       <nav className="nav nao-imprime" style={{ gridTemplateColumns: `repeat(${itens.length}, 1fr)` }}>
         {itens.map(i => (
-          <Link key={i.href} href={i.href} className={(i.href === '/' ? path === '/' : [i.href, ...(('tambem' in i && i.tambem) || [])].some(h => path.startsWith(h))) ? 'ativo' : ''}>
+          <Link key={i.href} href={i.href} className={(i.href === '/' ? (path === '/' || path.startsWith('/estoque')) : [i.href, ...(('tambem' in i && i.tambem) || [])].some(h => path.startsWith(h))) ? 'ativo' : ''}>
             <span aria-hidden>{i.icone}</span>{i.nome}
           </Link>
         ))}
