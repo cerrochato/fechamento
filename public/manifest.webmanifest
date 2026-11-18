@@ -1,0 +1,10 @@
+{
+  "name": "Fechamento",
+  "short_name": "Fechamento",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f3ee",
+  "theme_color": "#2f5d3a",
+  "lang": "pt-BR",
+  "icons": [{ "src": "/icone.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
