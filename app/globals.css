@@ -166,3 +166,19 @@ td.e { color: var(--entrada); } td.s { color: var(--saida); }
 .vlinha polyline { fill:none; stroke:var(--dash-linha); stroke-width:2; vector-effect:non-scaling-stroke; }
 .vpct { position:absolute; left:50%; transform:translate(-50%, 50%); z-index:2; background:var(--dash-linha); color:#fff; font-size:.68rem; font-weight:700; padding:1px 5px; border-radius:8px; }
 @media (max-width: 520px) { .dash-hero { grid-template-columns:1fr 1fr; } .hero strong { font-size:1.2rem; } .dash-graficos { grid-template-columns:1fr; padding:12px; } .dash-kpis { grid-template-columns:1fr 1fr; padding:12px 12px 0; } }
+
+/* Financeiro */
+tr.sub td { font-weight:700; background:var(--dash-faixa); }
+tr.sub td:first-child { background:var(--dash-faixa); }
+.cascata td { font-variant-numeric:tabular-nums; }
+.cascata tr.res td { font-weight:700; border-bottom:2px solid var(--texto); }
+td.neg { color:var(--saida); }
+tr.abre td:first-child { cursor:pointer; }
+tr.n3 td:first-child { padding-left:24px; } tr.n4 td:first-child { padding-left:40px; color:var(--suave); }
+.fluxo-cols { display:flex; gap:8px; height:220px; }
+.fluxo-col { flex:1; min-width:48px; display:flex; flex-direction:column; align-items:center; gap:2px; }
+.fluxo-col small { font-size:.7rem; color:var(--suave); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.fluxo-col small.neg { color:var(--saida); }
+.fluxo-par { flex:1; width:100%; display:flex; align-items:flex-end; justify-content:center; gap:2px; border-bottom:1px solid var(--borda); }
+.fluxo-par > div { width:40%; max-width:18px; min-height:1px; border-radius:3px 3px 0 0; }
+.fluxo-col:hover .fluxo-par > div { outline:2px solid var(--texto); outline-offset:1px; }

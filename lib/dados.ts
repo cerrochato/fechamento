@@ -702,3 +702,36 @@ export function inicioSafra(iso: string): string {
   const [a, m] = iso.split('-').map(Number);
   return `${m >= 7 ? a : a - 1}-07-01`;
 }
+
+// ---------------------------------------------------------------------------
+// Financeiro (plano de contas do SW Rural e lançamentos importados)
+// ---------------------------------------------------------------------------
+
+export interface ContaFin { codigo: string; nome: string; nivel: number; tipo: 'receita' | 'despesa' | 'outro' }
+export interface LancFin { data: string; mensal: boolean; conta_codigo: string; valor: number }
+
+let _contas: ContaFin[] | null = null;
+export async function contasFinanceiras(): Promise<ContaFin[]> {
+  if (_contas) return _contas;
+  const ls: ContaFin[] = DEMO ? (await seed()).conta_financeira : ok(await supabase().from('conta_financeira').select('codigo, nome, nivel, tipo'));
+  _contas = ls.map(c => ({ ...c, nivel: Number(c.nivel) }));
+  return _contas;
+}
+
+// Lançamentos do período. Os do relatório mensal (mensal = true, datados no dia 1º) entram quando o mês está no período.
+export async function lancamentosFinanceiros(propriedadeId: number, de: string, ate: string): Promise<LancFin[]> {
+  const ini = de.slice(0, 8) + '01';
+  let ls: LancFin[];
+  if (DEMO) {
+    ls = (await seed()).lancamento_financeiro.filter((l: LancFin & { propriedade_id: number }) => l.propriedade_id === propriedadeId && l.data >= ini && l.data <= ate);
+  } else {
+    ls = [];
+    for (let i = 0; ; i += 1000) {
+      const pg = ok(await supabase().from('lancamento_financeiro').select('data, mensal, conta_codigo, valor')
+        .eq('propriedade_id', propriedadeId).gte('data', ini).lte('data', ate).order('id').range(i, i + 999)) as LancFin[];
+      ls.push(...pg);
+      if (pg.length < 1000) break;
+    }
+  }
+  return ls.filter(l => l.mensal || l.data >= de).map(l => ({ ...l, valor: Number(l.valor) }));
+}
