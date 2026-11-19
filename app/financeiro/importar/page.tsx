@@ -11,7 +11,7 @@ const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julh
 const nomeMes = (m: string) => `${MESES[Number(m.slice(5, 7)) - 1]}/${m.slice(0, 4)}`;
 const num = (s: string) => Number(s.replace(/\./g, '').replace(',', '.'));
 
-interface Lido { arquivo: string; todas: LinhaSW[]; folhas: LinhaSW[]; totRec?: number; totDesp?: number }
+interface Lido { arquivo: string; todas: LinhaSW[]; folhas: LinhaSW[]; diretas: string[]; totRec?: number; totDesp?: number }
 
 // Lê o .csv do SW (separador ;, números 1.234,56, acentos em Windows-1252)
 async function lerArquivo(f: File): Promise<Lido> {
@@ -30,7 +30,15 @@ async function lerArquivo(f: File): Promise<Lido> {
   }
   // só as contas sem contas filhas no arquivo: as de cima são somas e contariam em dobro
   const folhas = todas.filter(l => !todas.some(o => o.codigo.startsWith(l.codigo + '.')));
-  return { arquivo: f.name, todas, folhas, totRec, totDesp };
+  // conta-mãe com lançamento feito direto nela: o que passa da soma das filhas entra na própria conta-mãe
+  const diretas: string[] = [];
+  for (const c of todas) {
+    const filhas = todas.filter(o => o.codigo.startsWith(c.codigo + '.') && o.codigo.split('.').length === c.codigo.split('.').length + 1);
+    if (!filhas.length) continue;
+    const d = Math.round((c.valor - filhas.reduce((s, o) => s + o.valor, 0)) * 100) / 100;
+    if (Math.abs(d) >= 0.01) { folhas.push({ ...c, valor: d }); diretas.push(c.codigo); }
+  }
+  return { arquivo: f.name, todas, folhas, diretas, totRec, totDesp };
 }
 
 function mesPassado() {
@@ -124,12 +132,19 @@ export default function ImportarSW() {
                 <tr><td>Contas com valor</td><td>{comValor.length}</td><td className="suave">de {lido.folhas.length} contas no arquivo</td></tr>
               </tbody>
             </table>
+            {lido.diretas.length > 0 && (
+              <div className="erro" style={{ marginTop: 10 }}>
+                <strong>⚠ Erro de lançamento no SW: valor lançado direto em conta-mãe, sem subconta.</strong>
+                <ul style={{ margin: '6px 0' }}>{lido.diretas.map(c => { const l = lido.folhas.find(f => f.codigo === c); return <li key={c}>{c} · {l?.nome}: {reais(l?.valor ?? 0)}</li>; })}</ul>
+                Corrija no SW lançando numa subconta. Se importar assim mesmo, o valor entra na própria conta-mãe para o total fechar.
+              </div>
+            )}
             {novas.length > 0 && <p className="aviso">{novas.length} conta(s) do arquivo ainda não existem no plano de contas e serão criadas: {novas.slice(0, 6).map(c => `${c.codigo} ${c.nome}`).join(' · ')}{novas.length > 6 ? '…' : ''}</p>}
             <details style={{ marginTop: 10 }}>
               <summary>Ver as contas com valor</summary>
               <div className="rolagem" style={{ marginTop: 8 }}>
                 <table>
-                  <tbody>{comValor.map(l => <tr key={l.codigo}><td>{l.codigo} · {l.nome}</td><td>{reais(l.valor)}</td></tr>)}</tbody>
+                  <tbody>{comValor.map(l => <tr key={l.codigo}><td>{l.codigo} · {l.nome}{lido.diretas.includes(l.codigo) ? ' (direto na conta-mãe)' : ''}</td><td>{reais(l.valor)}</td></tr>)}</tbody>
                 </table>
               </div>
             </details>
